@@ -39,3 +39,12 @@ File.WriteAllText("report.json", ReportSerializer.Serialize(result.Definition));
 - Not imported (warned): images, charts, subreports, column groups, row-group header cells, several Tablix, conditional visibility, per-side borders (all sides are drawn), multiple paragraphs, `CanGrow` (set `wrap` yourself and pass an `ITextMeasurer`).
 - RDL 2005 `Table` is not read; open the file in Visual Studio and save it to upgrade it to Tablix.
 - Always review the result: the importer reports what it knows it skipped, not whether the layout looks right.
+
+## Designer (`src/ClioReport.Designer/wwwroot/index.html`)
+
+A single HTML file, no build step and no dependencies: open it in Chrome or Edge. It edits the same JSON the engine reads.
+
+- **Open / Save**: Chrome and Edge save back to the same file; other browsers download it. Drag a `.json` file onto the page to open it.
+- **Canvas**: bands are drawn to scale (mm). Drag to move, handles to resize, drag a band's bottom edge for its height. Arrow keys nudge (Shift = 5 mm), Alt disables snapping, Ctrl+Z / Ctrl+Y undo and redo, Ctrl+D duplicates, Delete removes.
+- **Panels**: left adds elements and bands (inserted in the usual order); right edits the selected element, band, or the report (page, groups, aggregates). `JSON...` shows and edits the raw file.
+- Saving writes only non-default properties, so files stay small. It cannot preview data yet: render with `ClioReport.Pdf` to check the result.

@@ -103,6 +103,73 @@ public sealed class ElementDefinition
     /// <summary>Static text.</summary>
     public string? Text { get; set; }
 
+    // ---- "table" and "list" elements -----------------------------------------------------------------------
+
+    /// <summary>
+    /// "table": the columns. Widths are in millimetres; columns with width 0 share what is left of the element
+    /// width. The table is as tall as its rows and grows its band; it cannot be split across pages.
+    /// </summary>
+    public List<ColumnDefinition>? Columns { get; set; }
+
+    /// <summary>
+    /// "table" and "list": name of the collection to repeat over, resolved with <c>GetRows</c> on the current row (so a
+    /// detail band can list the children of its row) or on the report root elsewhere.
+    /// </summary>
+    public string? Source { get; set; }
+
+    /// <summary>"table": fixed rows instead of <see cref="Source"/>. Each cell is text, or an expression when it starts with "=".</summary>
+    public List<List<string>>? Rows { get; set; }
+
+    /// <summary>"table": height of a data row in millimetres (default 5). Rows grow when <see cref="Wrap"/> is on.</summary>
+    public double RowHeight { get; set; }
+
+    /// <summary>"table": height of the header row; 0 uses <see cref="RowHeight"/>.</summary>
+    public double HeaderHeight { get; set; }
+
+    /// <summary>"table": print the header row (column titles, bold, filled with <see cref="Fill"/>). Default true.</summary>
+    public bool ShowHeader { get; set; } = true;
+
+    /// <summary>"table": background colour of every second data row.</summary>
+    public string? AltFill { get; set; }
+
+    /// <summary>"list": elements of one item, positioned relative to the item's top-left corner. They see the item's fields.</summary>
+    public List<ElementDefinition>? Items { get; set; }
+
+    /// <summary>"list": height of one item in millimetres. Items have a fixed height; elements inside do not grow it.</summary>
+    public double ItemHeight { get; set; }
+
+    /// <summary>"list": items per row (default 1); item width is the element width shared by this many items.</summary>
+    public int Across { get; set; } = 1;
+
+    /// <summary>"list": space between items, horizontally and vertically, in millimetres.</summary>
+    public double Gap { get; set; }
+
+    internal ElementDefinition WithOffset(double dx, double dy)
+    {
+        var copy = (ElementDefinition)MemberwiseClone();
+        copy.X += dx;
+        copy.Y += dy;
+        return copy;
+    }
+
     /// <summary>Expression evaluated per row; takes precedence over <see cref="Text"/>.</summary>
     public string? Expression { get; set; }
+}
+
+/// <summary>A column of a "table" element.</summary>
+public sealed class ColumnDefinition
+{
+    /// <summary>Title printed in the header row.</summary>
+    public string Header { get; set; } = "";
+
+    /// <summary>Expression evaluated per row (fields of the row). Takes precedence over <see cref="Text"/>.</summary>
+    public string? Expression { get; set; }
+
+    /// <summary>Static text, used when there is no expression.</summary>
+    public string? Text { get; set; }
+
+    /// <summary>Column width in millimetres; 0 shares the remaining width.</summary>
+    public double Width { get; set; }
+
+    public TextAlign Align { get; set; }
 }

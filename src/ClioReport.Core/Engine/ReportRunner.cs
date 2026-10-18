@@ -150,20 +150,7 @@ internal sealed class ReportRunner
                     $"{b.Type} band (height {b.Height}) does not fit in the page body (height {bodyHeight}).");
 
             foreach (var e in b.Elements)
-            {
-                if (KindOf(e.Type) is null)
-                    throw new ReportException($"Unsupported element type '{e.Type}'.");
-                if (e.Padding < 0 || 2 * e.Padding >= e.Width)
-                    throw new ReportException($"{b.Type} band: padding must be at least 0 and less than half the element width.");
-                if (e.Rotate is not (0 or 90 or 270))
-                    throw new ReportException($"{b.Type} band: rotate must be 0, 90 or 270.");
-                CheckColor(b, e.Color);
-                CheckColor(b, e.Fill);
-                if (e.FontSize < 0)
-                    throw new ReportException("An element has a negative fontSize.");
-                if (e.Wrap && _measurer is null)
-                    throw new ReportException("An element uses 'wrap' but no ITextMeasurer was passed to ReportEngine.Render.");
-            }
+                ValidateElement(b, e);
         }
 
         var aggregateNames = new HashSet<string>(StringComparer.Ordinal);
@@ -229,6 +216,66 @@ internal sealed class ReportRunner
         {
             throw new ReportException($"Error in expression '{text}': {ex.Message}", ex);
         }
+    }
+
+    private void ValidateElement(BandDefinition b, ElementDefinition e)
+    {
+        var type = e.Type.ToLowerInvariant();
+        if (type is not ("table" or "list") && KindOf(e.Type) is null)
+            throw new ReportException($"Unsupported element type '{e.Type}'.");
+        if (e.Padding < 0 || (e.Padding > 0 && 2 * e.Padding >= e.Width))
+            throw new ReportException($"{b.Type} band: padding must be at least 0 and less than half the element width.");
+        if (e.Rotate is not (0 or 90 or 270))
+            throw new ReportException($"{b.Type} band: rotate must be 0, 90 or 270.");
+        CheckColor(b, e.Color);
+        CheckColor(b, e.Fill);
+        CheckColor(b, e.AltFill);
+        if (e.FontSize < 0)
+            throw new ReportException("An element has a negative fontSize.");
+        if (e.Wrap && _measurer is null)
+            throw new ReportException("An element uses 'wrap' but no ITextMeasurer was passed to ReportEngine.Render.");
+
+        if (type == "table")
+        {
+            if (e.Width <= 0) throw new ReportException($"{b.Type} band: a table needs a width.");
+            if (e.Columns is null || e.Columns.Count == 0)
+                throw new ReportException($"{b.Type} band: a table needs at least one column.");
+            if (string.IsNullOrWhiteSpace(e.Source) == (e.Rows is null))
+                throw new ReportException($"{b.Type} band: a table needs either 'source' or 'rows' (not both).");
+            if (e.RowHeight < 0 || e.HeaderHeight < 0)
+                throw new ReportException($"{b.Type} band: table row heights cannot be negative.");
+            if (e.Columns.Any(c => c.Width < 0))
+                throw new ReportException($"{b.Type} band: a table column has a negative width.");
+            var fixedWidth = e.Columns.Sum(c => c.Width);
+            var free = e.Columns.Count(c => c.Width == 0);
+            if (fixedWidth > e.Width + Epsilon || (free > 0 && fixedWidth >= e.Width - Epsilon))
+                throw new ReportException($"{b.Type} band: the table columns do not fit in the table width ({e.Width} mm).");
+            if (e.Padding > 0 && ColumnWidths(e).Any(w => 2 * e.Padding >= w))
+                throw new ReportException($"{b.Type} band: table padding is too large for the narrowest column.");
+            if (e.Rows is not null && e.Rows.Any(r => r.Count > e.Columns.Count))
+                throw new ReportException($"{b.Type} band: a table row has more cells than the table has columns.");
+        }
+        else if (type == "list")
+        {
+            if (e.Width <= 0) throw new ReportException($"{b.Type} band: a list needs a width.");
+            if (string.IsNullOrWhiteSpace(e.Source))
+                throw new ReportException($"{b.Type} band: a list needs a 'source'.");
+            if (e.Items is null || e.Items.Count == 0)
+                throw new ReportException($"{b.Type} band: a list needs at least one element in 'items'.");
+            if (e.Across < 1 || e.Gap < 0 || e.ItemHeight < 0)
+                throw new ReportException($"{b.Type} band: a list needs across of at least 1 and no negative gap or itemHeight.");
+            if (e.Gap * (e.Across - 1) >= e.Width - Epsilon)
+                throw new ReportException($"{b.Type} band: the list gaps leave no room for the items.");
+            foreach (var item in e.Items) ValidateElement(b, item);
+        }
+    }
+
+    private static double[] ColumnWidths(ElementDefinition e)
+    {
+        var columns = e.Columns!;
+        var free = columns.Count(c => c.Width == 0);
+        var share = free == 0 ? 0 : (e.Width - columns.Sum(c => c.Width)) / free;
+        return columns.Select(c => c.Width == 0 ? share : c.Width).ToArray();
     }
 
     // ---- rows and groups ----
@@ -431,8 +478,36 @@ internal sealed class ReportRunner
     {
         height = band.Height;
         var items = new List<PreparedElement>(band.Elements.Count);
-        foreach (var e in band.Elements)
+        PrepareElements(band, band.Elements, (EngineContext)ctx, 0, 0, items, ref height);
+
+        for (var i = 0; i < items.Count; i++)
         {
+            var item = items[i];
+            if (item.Def.FitBand && item.Kind != ElementKind.Line)
+                items[i] = item with { Height = Math.Max(item.Height, height - item.Def.Y) };
+        }
+        return items;
+    }
+
+    /// <summary>Evaluates elements into prepared ones, shifted by (dx, dy). Tables and lists expand into plain text elements.</summary>
+    private void PrepareElements(BandDefinition band, IEnumerable<ElementDefinition> elements, EngineContext ctx,
+        double dx, double dy, List<PreparedElement> items, ref double height)
+    {
+        foreach (var source in elements)
+        {
+            var type = source.Type.ToLowerInvariant();
+            if (type == "table")
+            {
+                PrepareTable(source, ctx, dx, dy, items, ref height);
+                continue;
+            }
+            if (type == "list")
+            {
+                PrepareList(band, source, ctx, dx, dy, items, ref height);
+                continue;
+            }
+
+            var e = dx == 0 && dy == 0 ? source : source.WithOffset(dx, dy);
             var kind = KindOf(e.Type)!.Value;
             byte[]? image = null;
             string text;
@@ -472,14 +547,99 @@ internal sealed class ReportRunner
             }
             items.Add(new PreparedElement(e, kind, text, elementHeight, lineHeight, image));
         }
+    }
 
-        for (var i = 0; i < items.Count; i++)
+    private void PrepareTable(ElementDefinition e, EngineContext ctx, double dx, double dy,
+        List<PreparedElement> items, ref double height)
+    {
+        var columns = e.Columns!;
+        var widths = ColumnWidths(e);
+        var rowHeight = e.RowHeight > 0 ? e.RowHeight : 5;
+        var wrapOn = e.Wrap && _measurer is not null;
+        var left = e.X + dx;
+        var y = e.Y + dy;
+
+        void AddRow(string[] texts, double minHeight, bool bold, string? fill)
         {
-            var item = items[i];
-            if (item.Def.FitBand && item.Kind != ElementKind.Line)
-                items[i] = item with { Height = Math.Max(item.Height, height - item.Def.Y) };
+            var style = new TextStyle(bold, e.Italic, e.FontSize);
+            var lineHeight = wrapOn ? _measurer!.GetLineHeight(style) : 0;
+            var cells = new string[columns.Count];
+            var rowH = minHeight;
+            for (var i = 0; i < cells.Length; i++)
+            {
+                if (wrapOn)
+                {
+                    var lines = TextWrapper.Wrap(texts[i], widths[i] - 2 * e.Padding, _measurer!, style);
+                    cells[i] = string.Join("\n", lines);
+                    rowH = Math.Max(rowH, lines.Count * lineHeight);
+                }
+                else
+                    cells[i] = texts[i];
+            }
+
+            var x = left;
+            for (var i = 0; i < cells.Length; i++)
+            {
+                var cell = new ElementDefinition
+                {
+                    Type = "text", X = x, Y = y, Width = widths[i], Height = rowH, Align = columns[i].Align, VAlign = e.VAlign,
+                    Bold = bold, Italic = e.Italic, FontSize = e.FontSize, Color = e.Color, Fill = fill, Border = e.Border,
+                    Thickness = e.Thickness, Padding = e.Padding
+                };
+                items.Add(new PreparedElement(cell, ElementKind.Text, cells[i], rowH, lineHeight, null));
+                x += widths[i];
+            }
+            y += rowH;
         }
-        return items;
+
+        if (e.ShowHeader)
+            AddRow(columns.Select(c => c.Header ?? "").ToArray(), e.HeaderHeight > 0 ? e.HeaderHeight : rowHeight, true, e.Fill);
+
+        var index = 0;
+        if (e.Rows is not null)
+        {
+            foreach (var row in e.Rows)
+            {
+                var texts = columns.Select((_, i) => i < row.Count ? StaticCell(row[i], ctx) : "").ToArray();
+                AddRow(texts, rowHeight, e.Bold, index++ % 2 == 1 ? e.AltFill : null);
+            }
+        }
+        else
+        {
+            foreach (var item in ctx.GetRows(e.Source!))
+            {
+                var rowCtx = ctx.WithRow(item);
+                var texts = columns.Select(c => !string.IsNullOrWhiteSpace(c.Expression)
+                    ? Values.Str(Eval(c.Expression!, rowCtx)) : c.Text ?? "").ToArray();
+                AddRow(texts, rowHeight, e.Bold, index++ % 2 == 1 ? e.AltFill : null);
+            }
+        }
+
+        height = Math.Max(height, y);
+    }
+
+    private string StaticCell(string cell, EngineContext ctx) =>
+        cell.StartsWith('=') ? Values.Str(Eval(cell[1..], ctx)) : cell;
+
+    private void PrepareList(BandDefinition band, ElementDefinition e, EngineContext ctx, double dx, double dy,
+        List<PreparedElement> items, ref double height)
+    {
+        var rows = ctx.GetRows(e.Source!).ToList();
+        var across = Math.Max(1, e.Across);
+        var itemWidth = (e.Width - e.Gap * (across - 1)) / across;
+        var itemHeight = e.ItemHeight > 0 ? e.ItemHeight : e.Height > 0 ? e.Height : 5;
+        var left = e.X + dx;
+        var top = e.Y + dy;
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var local = 0.0; // items have a fixed height: growth inside an item is ignored
+            PrepareElements(band, e.Items!, ctx.WithRow(rows[i]),
+                left + i % across * (itemWidth + e.Gap), top + i / across * (itemHeight + e.Gap), items, ref local);
+        }
+
+        var lines = (rows.Count + across - 1) / across;
+        if (lines > 0) height = Math.Max(height, top + lines * itemHeight + (lines - 1) * e.Gap);
     }
 
     private static void CheckQrCode(BandDefinition band, string text)

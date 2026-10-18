@@ -1,0 +1,1315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClioReport Designer</title>
+<style>
+:root {
+  --bg: #e9ecf1; --panel: #ffffff; --panel2: #f6f7f9; --line: #e2e5eb; --line2: #cfd4dd; --text: #1b2230; --muted: #566070;
+  --accent: #2f4fd0; --accent-soft: #e3e9ff; --paper: #ffffff; --danger: #d6336c; --guide: #c3cad8;
+  --shadow: 0 1px 2px rgba(20,30,50,.06), 0 8px 28px rgba(20,30,50,.10);
+  --c-page: #64748b; --c-report: #4f46e5; --c-colhead: #0d9488; --c-group: #9333ea; --c-detail: #16a34a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101216; --panel: #1a1d23; --panel2: #20242b; --line: #2b3039; --line2: #3a404b; --text: #e8eaee; --muted: #8f97a6;
+    --accent: #7c97ff; --accent-soft: #222c52; --paper: #23272e; --danger: #ff6b9a; --guide: #444b58;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.45);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font: 13px/1.4 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+svg.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+#app { display: grid; grid-template-rows: 48px 1fr; height: 100vh; }
+
+/* top bar */
+#top { display: flex; gap: 8px; align-items: center; padding: 0 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 650; letter-spacing: -.01em; margin-right: 6px; }
+.brand .logo { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, var(--accent), #7c4dff); display: grid; place-items: center; color: #fff; }
+.brand .logo svg { width: 14px; height: 14px; stroke-width: 2.2; }
+.brand small { color: var(--muted); font-weight: 500; }
+.grp { display: flex; gap: 2px; padding: 2px; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; }
+.sp { flex: 1; }
+#fileName { color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button { font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 5px 9px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background .12s, border-color .12s; }
+button:hover:not(:disabled) { background: var(--accent-soft); }
+button:disabled { opacity: .38; cursor: default; }
+button.primary { background: var(--accent); color: #fff; font-weight: 600; }
+button.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+button.ghost { border-color: var(--line2); background: var(--panel); }
+button.danger { color: var(--danger); }
+button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+button.icon { padding: 5px 7px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line2); cursor: pointer; user-select: none; }
+.chip input { accent-color: var(--accent); margin: 0; }
+#zval { cursor: pointer; min-width: 44px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+#main { display: grid; grid-template-columns: 188px 1fr 300px; min-height: 0; }
+#tools, #props { background: var(--panel); overflow: auto; }
+#tools { border-right: 1px solid var(--line); padding: 14px 12px; }
+#props { border-left: 1px solid var(--line); padding: 14px; }
+h4 { margin: 18px 0 8px; font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+h4:first-child { margin-top: 0; }
+
+/* stage + paper */
+#stage { overflow: auto; padding: 28px 28px 80px 210px; }
+.sheet { position: relative; background: #ffffff; color: #111111; box-shadow: var(--shadow); border-radius: 2px; }
+.sheet .guide { position: absolute; border: 1px dashed #b9c0cf; pointer-events: none; }
+.band { position: relative; margin-bottom: 0; }
+.band .label { position: absolute; top: 0; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted);
+  white-space: nowrap; cursor: pointer; user-select: none; text-align: right; flex-direction: column; align-items: flex-end; gap: 1px; padding: 3px 0; }
+.band .label .t { display: flex; align-items: center; gap: 6px; }
+.band .label .dot { width: 9px; height: 9px; border-radius: 3px; background: var(--bc); flex: none; }
+.band .label b { font-weight: 600; color: var(--text); }
+.band .label span { opacity: .75; }
+.band.sel .label b { color: var(--bc); }
+.band .body { position: relative; border-top: 2px solid var(--bc); border-bottom: 1px dashed color-mix(in srgb, var(--bc) 55%, transparent);
+  background: color-mix(in srgb, var(--bc) 6%, transparent); }
+.band.sel .body { background-color: color-mix(in srgb, var(--bc) 11%, transparent);
+  background-image: linear-gradient(var(--gl) 1px, transparent 1px), linear-gradient(90deg, var(--gl) 1px, transparent 1px);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bc) 40%, transparent); --gl: color-mix(in srgb, var(--bc) 22%, transparent); }
+.band .vh { position: absolute; left: 0; right: 0; bottom: -5px; height: 9px; cursor: ns-resize; z-index: 5; }
+.band .vh::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 28px; height: 3px; margin-left: -14px; border-radius: 3px;
+  background: var(--bc); opacity: 0; transition: opacity .12s; }
+.band:hover .vh::after, .band.sel .vh::after { opacity: .7; }
+.el { position: absolute; overflow: hidden; cursor: move; user-select: none; white-space: pre; display: flex; }
+.el:hover { outline: 1px solid var(--accent); }
+.el.sel { outline: 2px solid var(--accent); z-index: 4; overflow: visible; }
+.el .txt { width: 100%; overflow: hidden; }
+.el.expr .txt { color: #0a6b43; font-weight: 500; }
+.el.ph { background: repeating-linear-gradient(135deg, rgba(120,128,150,.18) 0 6px, rgba(120,128,150,.07) 6px 12px);
+  align-items: center; justify-content: center; color: #5b6475; font-size: 11px; }
+.el.barcode { background: repeating-linear-gradient(90deg, #222 0 2px, transparent 2px 4px, #222 4px 5px, transparent 5px 8px); opacity: .8; }
+ .el.tbl { cursor: move; }
+.cell { position: absolute; display: flex; align-items: center; overflow: hidden; white-space: pre; box-sizing: border-box; }
+.cell.expr { color: #0a6b43; }
+.el.list { outline: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.el.list .tag { position: absolute; right: 2px; top: -15px; font-size: 10px; padding: 0 6px; border-radius: 99px;
+  background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.el.list .ghost { position: absolute; left: 0; right: 0; border: 1px dashed var(--guide); opacity: .8; pointer-events: none; }
+.handle { position: absolute; width: 9px; height: 9px; background: #fff; border: 1.5px solid var(--accent); border-radius: 2px; z-index: 6; }
+.empty { margin: 60px auto; max-width: 320px; text-align: center; color: var(--muted); }
+
+/* props */
+.ptitle { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.ptitle b { font-size: 14px; letter-spacing: -.01em; }
+.badge { font-size: 10.5px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.row { display: grid; grid-template-columns: 86px 1fr; gap: 8px; align-items: center; margin-bottom: 7px; }
+.row > label { color: var(--muted); }
+input[type=text], input[type=number], select, textarea { width: 100%; padding: 5px 8px; border: 1px solid var(--line2); border-radius: 7px;
+  background: var(--panel); color: var(--text); font: inherit; min-width: 0; }
+input:focus, select:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); border-color: var(--accent); }
+textarea { min-height: 52px; resize: vertical; font: 12px ui-monospace, Consolas, monospace; }
+.xywh { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.num { position: relative; }
+.num span { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--muted); pointer-events: none; font-weight: 600; }
+.num input { padding-left: 26px; }
+.seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.seg button { border-radius: 0; padding: 4px 9px; border: 0; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--accent); color: #fff; }
+.sw { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.sw input { display: none; }
+.sw i { width: 30px; height: 17px; border-radius: 99px; background: var(--line2); position: relative; transition: background .12s; flex: none; }
+.sw i::after { content: ""; position: absolute; left: 2px; top: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: transform .12s; }
+.sw input:checked + i { background: var(--accent); }
+.sw input:checked + i::after { transform: translateX(13px); }
+.card { border: 1px solid var(--line); background: var(--panel2); border-radius: 9px; padding: 9px; margin-bottom: 8px; }
+.hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.colour { display: flex; gap: 6px; }
+.colour input[type=color] { width: 34px; padding: 1px; height: 28px; border: 1px solid var(--line2); border-radius: 7px; background: var(--panel); }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); width: min(780px, 92vw); box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(10,14,22,.45); }
+dialog textarea { width: 100%; height: 55vh; font: 12px ui-monospace, Consolas, monospace; }
+#toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #1b2230; color: #fff;
+  padding: 7px 14px; border-radius: 9px; opacity: 0; transition: opacity .2s; pointer-events: none; box-shadow: var(--shadow); }
+#toast.on { opacity: .96; }
+
+/* ---- v2: structure, rail, outline, ruler ------------------------------------------------------------------- */
+:root {
+  --bg: #e9ebef; --panel: #ffffff; --panel2: #f4f5f7; --line: #e3e5ea; --line2: #cfd3db; --text: #151922; --muted: #5b6475;
+  --accent: #d9480f; --accent-soft: #fdebe2; --on-accent: #ffffff; --dot: rgba(20,30,50,.14); --tick: #8c95a5;
+  --shadow: 0 0 0 1px rgba(20,30,50,.06), 0 10px 30px rgba(20,30,50,.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1014; --panel: #161a20; --panel2: #1c2027; --line: #262b34; --line2: #373d49; --text: #e9ebef; --muted: #98a0af;
+    --accent: #ff8a4c; --accent-soft: #3a2316; --on-accent: #1d0f06; --dot: rgba(255,255,255,.09); --tick: #6d7586;
+    --shadow: 0 0 0 1px rgba(255,255,255,.05), 0 12px 34px rgba(0,0,0,.55);
+  }
+}
+html, body { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+#app { grid-template-rows: 44px 1fr 26px; }
+#top { height: 44px; padding: 0 10px; gap: 6px; }
+.brand { font-weight: 700; font-size: 13px; letter-spacing: -.01em; }
+.brand .logo { width: 22px; height: 22px; border-radius: 6px; background: var(--text); color: var(--panel); }
+.brand .logo svg { width: 13px; height: 13px; stroke-width: 2.4; }
+.grp { background: transparent; border: 0; padding: 0; gap: 2px; }
+.grp + .grp { padding-left: 8px; margin-left: 2px; border-left: 1px solid var(--line); }
+button { border-radius: 6px; padding: 4px 8px; }
+button.primary { background: var(--accent); color: var(--on-accent); }
+.seg button.on { background: var(--accent); color: var(--on-accent); }
+.doc { display: flex; align-items: center; gap: 7px; color: var(--muted); max-width: 40%; }
+#fileName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: var(--text); }
+#dirty { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.chip { padding: 3px 9px; }
+
+#main { grid-template-columns: 46px 232px 1fr 304px; }
+#rail { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; }
+#rail .rbtn { width: 34px; height: 34px; padding: 0; justify-content: center; position: relative; }
+#rail .rbtn svg.i { width: 18px; height: 18px; }
+#rail .sep { width: 22px; height: 1px; background: var(--line); margin: 6px 0; }
+[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); z-index: 50;
+  background: var(--text); color: var(--panel); padding: 3px 8px; border-radius: 5px; font-size: 11.5px; white-space: nowrap; pointer-events: none; }
+#bandMenu { position: fixed; z-index: 60; width: 190px; padding: 5px; background: var(--panel); border: 1px solid var(--line2);
+  border-radius: 9px; box-shadow: var(--shadow); }
+#bandMenu button { width: 100%; justify-content: flex-start; gap: 9px; padding: 5px 8px; }
+#bandMenu .dot { width: 9px; height: 9px; border-radius: 3px; }
+#bandMenu .ttl { padding: 4px 8px 6px; color: var(--muted); font-size: 11.5px; }
+
+#outline { background: var(--panel); border-right: 1px solid var(--line); overflow: auto; padding: 6px 6px 20px; }
+#outline .ohead { padding: 6px 8px; font-weight: 650; display: flex; align-items: center; }
+.orow { display: flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: 6px; cursor: pointer; min-height: 26px; }
+.orow:hover { background: var(--panel2); }
+.orow.sel { background: var(--accent-soft); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+.orow .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.orow .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orow .meta { color: var(--muted); font-size: 11px; flex: none; }
+.orow.obnd { font-weight: 600; margin-top: 4px; }
+.orow.oel { color: var(--muted); }
+.orow.oel.sel { color: var(--text); }
+.orow svg.i { width: 14px; height: 14px; flex: none; opacity: .75; }
+
+#stagewrap { position: relative; min-height: 0; min-width: 0; display: grid; }
+#stage { overflow: auto; padding: 0 28px 90px 210px; background-color: var(--bg);
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px; }
+#ruler { position: sticky; top: 0; z-index: 9; height: 22px; margin: 0 0 14px; background-color: var(--panel); border-radius: 0 0 4px 4px;
+  box-shadow: 0 1px 0 var(--line2), 0 6px 14px -8px rgba(20,30,50,.35); overflow: hidden; }
+#ruler .rl { position: absolute; top: 2px; font-size: 9.5px; color: var(--muted); }
+#ruler .rm { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--text) 8%, transparent); }
+#ruler .rsel { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 32%, transparent); border-left: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+.sheet { margin-top: 2px; }
+.zoompill { position: absolute; right: 22px; bottom: 16px; display: flex; align-items: center; background: var(--panel); border: 1px solid var(--line2);
+  border-radius: 999px; padding: 2px; box-shadow: var(--shadow); }
+.zoompill button { border-radius: 999px; }
+#zval { min-width: 50px; justify-content: center; color: var(--text); }
+.el.sel { outline-color: var(--accent); }
+.el:hover { outline-color: var(--accent); }
+.handle { border-color: var(--accent); }
+
+#props { padding: 12px 14px 24px; }
+#props h4 { margin: 18px 0 9px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; font-weight: 650; text-transform: none; letter-spacing: 0; color: var(--text); }
+#props h4:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.ptitle b { font-size: 14px; }
+input[type=text], input[type=number], select, textarea { border-radius: 6px; padding: 4px 8px; }
+.card { background: transparent; }
+.badge { background: var(--panel2); color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
+
+.num input[type=number] { padding-left: 25px; }
+.band.sel .body { background-color: color-mix(in srgb, var(--bc) 8%, transparent); }
+/* v3: scrollbars + drag-drop + multi-select */
+.marquee { position: absolute; z-index: 6; pointer-events: none; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.el.msel { outline: 2px solid var(--accent); outline-offset: 0; }
+.hint { color: var(--muted); font-size: 11.5px; line-height: 1.5; margin: 12px 0 0; }
+#props .seg button { padding: 5px 4px; font-size: 12px; }
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 40%, transparent) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 38%, transparent); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted) 65%, transparent); background-clip: content-box; border: 2px solid transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+.rbtn[draggable=true] { cursor: grab; }
+.rbtn[draggable=true]:active { cursor: grabbing; }
+body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: -1px; }
+.band .body.droptarget { outline: 2px solid var(--accent) !important; outline-offset: -2px; background-color: color-mix(in srgb, var(--accent) 10%, transparent); }
+#status { display: flex; align-items: center; gap: 12px; padding: 0 12px; background: var(--panel); border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+#statSel { color: var(--text); font-weight: 500; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <div class="brand"><div class="logo" id="logo"></div><span>ClioReport</span></div>
+    <div class="grp">
+      <button id="bNew" title="New report"></button>
+      <button id="bOpen" title="Open JSON"></button>
+      <button id="bSaveAs" title="Save as" class="icon"></button>
+    </div>
+    <div class="grp">
+      <button id="bUndo" class="icon" title="Undo (Ctrl+Z)"></button>
+      <button id="bRedo" class="icon" title="Redo (Ctrl+Y)"></button>
+    </div>
+    <span class="sp"></span>
+    <div class="doc"><span id="fileName"></span><i id="dirty" title="Unsaved changes" hidden></i></div>
+    <span class="sp"></span>
+    <label class="chip" title="Snap to 0.5 mm"><input type="checkbox" id="snap" checked> Snap</label>
+    <button id="bJson" class="ghost"></button>
+    <button id="bSave" class="primary" title="Save (Ctrl+S)"></button>
+    <input type="file" id="fileInput" accept=".json,application/json" hidden>
+  </div>
+  <div id="main">
+    <div id="rail"></div>
+    <div id="outline"></div>
+    <div id="stagewrap">
+      <div id="stage"><div id="page"></div></div>
+      <div class="zoompill"><button id="zOut" class="icon" title="Zoom out"></button><button id="zval"></button><button id="zIn" class="icon" title="Zoom in"></button></div>
+    </div>
+    <div id="props"></div>
+  </div>
+  <div id="status"><span id="statSel"></span><span class="sp"></span><span>Drag to move · arrows nudge · Alt = no snap · Ctrl+Z undo · Ctrl+D duplicate</span></div>
+</div>
+<div id="bandMenu" hidden></div>
+<dialog id="jsonDlg">
+  <h3 style="margin:0 0 10px">Report JSON</h3>
+  <textarea id="jsonText" spellcheck="false"></textarea>
+  <p id="jsonErr" class="hint" style="color:var(--danger)"></p>
+  <div class="actions" style="justify-content:flex-end">
+    <button id="jsonCopy" class="ghost">Copy</button><button id="jsonApply" class="primary">Apply</button><button id="jsonClose" class="ghost">Close</button>
+  </div>
+</dialog>
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ---------------------------------------------------------------- model helpers
+const BAND_TYPES = ['pageHeader', 'reportHeader', 'columnHeader', 'groupHeader', 'detail', 'groupFooter', 'reportFooter', 'pageFooter'];
+const ELEMENT_TYPES = ['text', 'line', 'rect', 'barcode', 'qrcode', 'image', 'table', 'list'];
+const FUNCTIONS = ['sum', 'count', 'avg', 'min', 'max'];
+const MM_PER_PT = 25.4 / 72;
+const lowerFirst = s => typeof s === 'string' && s.length ? s[0].toLowerCase() + s.slice(1) : s;
+
+const ELEMENT_DEFAULTS = { type: 'text', align: 'left', vAlign: 'top', thickness: 0.2, bold: false, italic: false,
+  underline: false, rotate: 0, fontSize: 0, padding: 0, border: false, wrap: false, fitBand: false,
+  rowHeight: 0, headerHeight: 0, across: 1, gap: 0, itemHeight: 0 };
+
+function blankReport() {
+  return { version: 1, name: 'NewReport', dataSource: 'items',
+    page: { width: 210, height: 297, margin: 10, columns: 1, columnGap: 0 },
+    groups: [], aggregates: [],
+    bands: [
+      { type: 'reportHeader', height: 14, elements: [ { x: 0, y: 3, width: 190, height: 8, align: 'center', bold: true, fontSize: 16, text: 'Report title' } ] },
+      { type: 'detail', height: 7, elements: [ { x: 0, y: 1, width: 60, height: 5, expression: 'name' } ] }
+    ] };
+}
+
+function normEl(e) {
+  e = Object.assign({}, e);
+  e.type = lowerFirst(e.type) || 'text';
+  if (e.align) e.align = lowerFirst(e.align);
+  if (e.vAlign) e.vAlign = lowerFirst(e.vAlign);
+  if (e.columns) e.columns = e.columns.map(c => Object.assign({}, c, c.align ? { align: lowerFirst(c.align) } : {}));
+  if (e.type === 'list') {
+    if (e.itemHeight) { e.height = e.itemHeight; delete e.itemHeight; }
+    e.items = (e.items || []).map(normEl);
+  }
+  return e;
+}
+
+function normalize(raw) {
+  const d = JSON.parse(JSON.stringify(raw));
+  d.version = d.version || 1;
+  d.name = d.name || '';
+  d.dataSource = d.dataSource || '';
+  d.page = Object.assign({ width: 210, height: 297, margin: 10, columns: 1, columnGap: 0 }, d.page || {});
+  d.groups = d.groups || [];
+  d.aggregates = (d.aggregates || []).map(a => Object.assign({}, a, { function: lowerFirst(a.function) }));
+  d.bands = (d.bands || []).map(b => {
+    b.type = lowerFirst(b.type);
+    b.elements = (b.elements || []).map(normEl);
+    return b;
+  });
+  return d;
+}
+
+function cleanEl(e) {
+  const r = {};
+  if (e.type && e.type !== 'text') r.type = e.type;
+  for (const k of ['x', 'y', 'width', 'height']) r[k] = e[k] ?? 0;
+  const skip = ['type', 'x', 'y', 'width', 'height', 'text', 'expression', 'columns', 'rows', 'items', 'showHeader', 'itemHeight'];
+  for (const [k, v] of Object.entries(e)) {
+    if (skip.includes(k)) continue;
+    if (v === undefined || v === null || v === '' || v === false) continue;
+    if (k in ELEMENT_DEFAULTS && ELEMENT_DEFAULTS[k] === v) continue;
+    r[k] = v;
+  }
+  if (e.text) r.text = e.text;
+  if (e.expression) r.expression = e.expression;
+  if (e.type === 'table') {
+    if (e.showHeader === false) r.showHeader = false;
+    r.columns = (e.columns || []).map(c => {
+      const o = {};
+      if (c.header) o.header = c.header;
+      if (c.expression) o.expression = c.expression;
+      if (c.text) o.text = c.text;
+      if (c.width) o.width = c.width;
+      if (c.align && c.align !== 'left') o.align = c.align;
+      return o;
+    });
+    if (e.rows) r.rows = e.rows;
+  }
+  if (e.type === 'list') r.items = (e.items || []).map(cleanEl);
+  return r;
+}
+
+function clean(def) {
+  const out = { version: 1 };
+  if (def.name) out.name = def.name;
+  if (def.dataSource) out.dataSource = def.dataSource;
+  const p = def.page, page = { width: p.width, height: p.height, margin: p.margin };
+  if (p.columns > 1) { page.columns = p.columns; if (p.columnGap) page.columnGap = p.columnGap; }
+  out.page = page;
+  if (def.groups.length) out.groups = def.groups.map(g => {
+    const o = { name: g.name, expression: g.expression };
+    if (g.pageBreakBefore) o.pageBreakBefore = true;
+    return o;
+  });
+  out.bands = def.bands.map(b => {
+    const o = { type: b.type, height: b.height };
+    if (b.group) o.group = b.group;
+    if (b.visible) o.visible = b.visible;
+    o.elements = b.elements.map(cleanEl);
+    return o;
+  });
+  if (def.aggregates.length) out.aggregates = def.aggregates.map(a => {
+    const o = { name: a.name, function: a.function, expression: a.expression };
+    if (a.group) o.group = a.group;
+    return o;
+  });
+  return out;
+}
+
+
+const ICONS = {
+  text: '<path d="M5 7V5h14v2M12 5v14M9 19h6"/>', line: '<path d="M5 19L19 5"/>', rect: '<rect x="4" y="6" width="16" height="12" rx="1.5"/>',
+  barcode: '<path d="M5 5v14M8 5v14M12 5v14M15 5v14M19 5v14"/>',
+  qrcode: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 19v1M19 14v1"/>',
+  image: '<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.4"/><path d="M5 17l5-4 3 2.5 3-3 3 3"/>',
+  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/>', redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/>',
+  open: '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
+  save: '<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>', saveas: '<path d="M5 4h11l3 3v6M5 4v16h7"/><path d="M8 4v5h7V4M17 21v-6M14 18h6"/>',
+  new: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M12 11v6M9 14h6"/>',
+  json: '<path d="M8 4c-2 0-2 2-2 4s-1 3-2 4c1 1 2 2 2 4s0 4 2 4M16 4c2 0 2 2 2 4s1 3 2 4c-1 1-2 2-2 4s0 4-2 4"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/>',
+  alignL: '<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>', alignC: '<path d="M4 6h16M7 10h10M4 14h16M7 18h10"/>', alignR: '<path d="M4 6h16M10 10h10M4 14h16M10 18h10"/>',
+  vTop: '<path d="M5 5h14"/><rect x="9" y="8" width="6" height="10" rx="1"/>', vMid: '<path d="M5 12h14"/><rect x="9" y="6" width="6" height="12" rx="1"/>',
+  vBot: '<path d="M5 19h14"/><rect x="9" y="6" width="6" height="10" rx="1"/>',
+  up: '<path d="M12 19V5M6 11l6-6 6 6"/>', down: '<path d="M12 5v14M6 13l6 6 6-6"/>', back: '<path d="M15 6l-6 6 6 6"/>',
+  table: '<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 10h16M4 14.5h16M10 5v14"/>',
+  list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="5" cy="6" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="18" r="1"/>',
+  layers: '<path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/>',
+  page: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/>',
+  logo: '<path d="M4 6h16M4 12h16M4 18h10"/>'
+};
+const ico = n => `<svg class="i" viewBox="0 0 24 24">${ICONS[n] || ''}</svg>`;
+const BAND_COLOR = { pageHeader: '--c-page', pageFooter: '--c-page', reportHeader: '--c-report', reportFooter: '--c-report',
+  columnHeader: '--c-colhead', groupHeader: '--c-group', groupFooter: '--c-group', detail: '--c-detail' };
+const bandVar = t => `var(${BAND_COLOR[t] || '--c-page'})`;
+
+// ---------------------------------------------------------------- state
+let def = blankReport();
+let sel = { kind: 'report' };            // {kind:'report'} | {kind:'band', b} | {kind:'element', b, e}
+let undoStack = [], redoStack = [], lastSnap = JSON.stringify(def);
+let zoom = 4, snap = true, fileHandle = null, fileName = '', savedSnap = lastSnap;
+const $ = id => document.getElementById(id);
+
+function commit() {
+  const now = JSON.stringify(def);
+  if (now === lastSnap) return;
+  undoStack.push(lastSnap); if (undoStack.length > 200) undoStack.shift();
+  redoStack = [];
+  lastSnap = now;
+  try { localStorage.setItem('clioDesigner.autosave', now); } catch (_) {}
+  refreshButtons();
+}
+function restore(snap) {
+  def = JSON.parse(snap); lastSnap = snap;
+  if (sel.kind !== 'report' && !def.bands[sel.b]) sel = { kind: 'report' };
+  if (sel.kind === 'element' && !safeEl(sel.b, sel.path)) sel = { kind: 'band', b: sel.b };
+  renderAll();
+}
+function undo() { if (!undoStack.length) return; redoStack.push(lastSnap); restore(undoStack.pop()); refreshButtons(); }
+function redo() { if (!redoStack.length) return; undoStack.push(lastSnap); restore(redoStack.pop()); refreshButtons(); }
+function refreshButtons() {
+  $('bUndo').disabled = !undoStack.length; $('bRedo').disabled = !redoStack.length;
+  const d = $('dirty'); if (d) d.hidden = lastSnap === savedSnap;
+}
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 1800); }
+
+const bodyWidth = () => def.page.width - 2 * def.page.margin;
+function bandWidth(b) {
+  const p = def.page;
+  if (b.type === 'detail' && p.columns > 1) return (bodyWidth() - p.columnGap * (p.columns - 1)) / p.columns;
+  return bodyWidth();
+}
+const round = v => Math.round(v * 100) / 100;
+const snapv = v => snap ? Math.round(v * 2) / 2 : round(v);
+const curBand = () => sel.kind === 'report' ? null : def.bands[sel.b];
+const curEl = () => sel.kind === 'element' ? elAt(sel.b, sel.path) : null;
+function containerAt(bi, path) {
+  let arr = def.bands[bi].elements;
+  for (let k = 0; k < path.length - 1; k++) arr = arr[path[k]].items;
+  return arr;
+}
+const elAt = (bi, path) => containerAt(bi, path)[path[path.length - 1]];
+function safeEl(bi, path) { try { return elAt(bi, path); } catch (_) { return undefined; } }
+const samePath = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+function colWidths(e) {
+  const cols = e.columns || [];
+  const fixed = cols.reduce((s, c) => s + (c.width || 0), 0), free = cols.filter(c => !c.width).length;
+  const share = free ? Math.max(0, (e.width - fixed) / free) : 0;
+  return cols.map(c => c.width || share);
+}
+function ensureShape(e) {
+  if (e.type === 'table') {
+    e.columns = e.columns || [{ header: 'Code', expression: 'code', width: 30 }, { header: 'Name', expression: 'name' }];
+    if (!e.rows && !e.source) e.source = 'items';
+    if (e.border === undefined) { e.border = true; e.padding = 1.5; e.fill = e.fill || '#EEEEEE'; }
+    if (!e.rowHeight) e.rowHeight = 6;
+  } else if (e.type === 'list') {
+    e.items = e.items || []; e.source = e.source || 'lines'; if (!e.height) e.height = 8;
+  }
+}
+
+// ---------------------------------------------------------------- canvas
+function renderCanvas() {
+  const page = $('page'); page.textContent = '';
+  page.append(buildRuler());
+  const m = def.page.margin * zoom;
+  const sheet = document.createElement('div'); sheet.className = 'sheet';
+  sheet.style.width = def.page.width * zoom + 'px'; sheet.style.minHeight = def.page.height * zoom + 'px';
+  sheet.style.padding = m + 'px';
+  sheet.onpointerdown = ev => { if (ev.target === sheet) select({ kind: 'report' }); };
+  const guide = document.createElement('div'); guide.className = 'guide';
+  guide.style.cssText = `left:${m}px;top:${m}px;right:${m}px;bottom:${m}px`;
+  sheet.append(guide);
+  if (!def.bands.length) {
+    const d = document.createElement('div'); d.className = 'empty'; d.textContent = 'No bands yet. Add one from the left panel.';
+    sheet.append(d);
+  }
+  def.bands.forEach((b, bi) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'band' + (sel.kind !== 'report' && sel.b === bi ? ' sel' : '');
+    wrap.style.setProperty('--bc', bandVar(b.type));
+    const label = document.createElement('div'); label.className = 'label';
+    label.style.right = `calc(100% + ${m + 12}px)`;
+    label.innerHTML = '<div class="t"><b></b><i class="dot"></i></div><span></span>';
+    const info = (b.group ? b.group + ' · ' : '') + b.height + ' mm';
+    label.querySelector('b').textContent = b.type;
+    if (b.height * zoom < 36) { label.querySelector('b').textContent = b.type + ' · ' + info; label.querySelector('span').remove(); }
+    else label.querySelector('span').textContent = info;
+    label.onclick = () => select({ kind: 'band', b: bi });
+    const body = document.createElement('div'); body.className = 'body';
+    body.style.width = bandWidth(b) * zoom + 'px'; body.style.height = b.height * zoom + 'px';
+    body.style.backgroundSize = `${zoom * 5}px ${zoom * 5}px`;
+    body.ondragover = ev => { if (!ev.dataTransfer.types.includes('text/clio-type')) return; ev.preventDefault(); ev.dataTransfer.dropEffect = 'copy'; body.classList.add('droptarget'); };
+    body.ondragleave = ev => { if (!body.contains(ev.relatedTarget)) body.classList.remove('droptarget'); };
+    body.ondrop = ev => {
+      const type = ev.dataTransfer.getData('text/clio-type'); if (!type) return;
+      ev.preventDefault(); body.classList.remove('droptarget'); document.body.classList.remove('dragging');
+      let host = ev.target.closest ? ev.target.closest('.el') : null, listPath = null, rc = body.getBoundingClientRect();
+      while (host && body.contains(host)) {
+        const p = JSON.parse(host.dataset.path || '[]'), he = p.length ? elAt(bi, p) : null;
+        if (he && he.type === 'list') { listPath = p; rc = host.getBoundingClientRect(); break; }
+        host = host.parentElement && host.parentElement.closest ? host.parentElement.closest('.el') : null;
+      }
+      addElement(type, { bi, listPath, x: (ev.clientX - rc.left) / zoom, y: (ev.clientY - rc.top) / zoom });
+    };
+    body.onpointerdown = ev => {
+      if (ev.target !== body || ev.button !== 0) return;
+      const add = ev.shiftKey || ev.ctrlKey || ev.metaKey, base = add && sel.kind === 'element' && sel.b === bi ? selList().filter(p => p.length === 1) : [];
+      const rc = body.getBoundingClientRect(), x0 = ev.clientX - rc.left, y0 = ev.clientY - rc.top;
+      if (!add) select({ kind: 'band', b: bi });
+      const live = () => document.querySelectorAll('.band .body')[bi];
+      const box = document.createElement('div'); box.className = 'marquee'; let moved = false;
+      const mv = m => {
+        const x1 = m.clientX - rc.left, y1 = m.clientY - rc.top;
+        if (!moved && Math.abs(x1 - x0) + Math.abs(y1 - y0) < 4) return;
+        if (!moved) { moved = true; live().append(box); }
+        const L = Math.min(x0, x1), T = Math.min(y0, y1), W = Math.abs(x1 - x0), H = Math.abs(y1 - y0);
+        Object.assign(box.style, { left: L + 'px', top: T + 'px', width: W + 'px', height: H + 'px' });
+        box._r = { L, T, R: L + W, B: T + H };
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); box.remove();
+        if (!moved || !box._r) return;
+        const r = box._r, hit = [];
+        b.elements.forEach((e, ei) => {
+          const L = e.x * zoom, T = e.y * zoom, R = (e.x + e.width) * zoom, B = (e.y + Math.max(e.height, 0.3)) * zoom;
+          if (L <= r.R && R >= r.L && T <= r.B && B >= r.T) hit.push([ei]);
+        });
+        const all = [...base]; for (const h of hit) if (!all.some(p => samePath(p, h))) all.push(h);
+        setMulti(bi, all);
+      };
+      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+    };
+    b.elements.forEach((e, ei) => body.append(renderElement(b, bi, e, [ei])));
+    const vh = document.createElement('div'); vh.className = 'vh'; vh.title = 'Drag to change band height';
+    vh.onpointerdown = ev => startBandResize(ev, bi);
+    body.append(vh);
+    wrap.append(label, body); sheet.append(wrap);
+  });
+  page.append(sheet);
+  renderOutline(); updateStatus();
+}
+
+function renderElement(b, bi, e, path) {
+  const el = document.createElement('div');
+  const isSel = sel.kind === 'element' && sel.b === bi && samePath(sel.path, path);
+  const isMulti = inMulti(bi, path);
+  el.className = 'el' + (isSel || isMulti ? ' sel' : '') + (isMulti ? ' msel' : '');
+  el.dataset.path = JSON.stringify(path);
+  el.style.left = e.x * zoom + 'px'; el.style.top = e.y * zoom + 'px';
+  el.style.width = e.width * zoom + 'px'; el.style.height = e.height * zoom + 'px';
+  const type = e.type || 'text';
+  if (type === 'text') {
+    const t = document.createElement('div'); t.className = 'txt';
+    const fs = (e.fontSize || 10) * MM_PER_PT * zoom;
+    t.style.fontSize = fs + 'px'; t.style.lineHeight = '1.15';
+    if (e.bold) t.style.fontWeight = '700'; if (e.italic) t.style.fontStyle = 'italic';
+    if (e.underline) t.style.textDecoration = 'underline';
+    t.style.textAlign = e.align || 'left';
+    if (e.color) t.style.color = e.color;
+    const hasText = !!e.text;
+    t.textContent = hasText ? e.text : (e.expression ? '{' + e.expression + '}' : '');
+    if (!hasText && e.expression) el.classList.add('expr');
+    el.style.alignItems = e.vAlign === 'middle' ? 'center' : e.vAlign === 'bottom' ? 'flex-end' : 'flex-start';
+    el.style.padding = `0 ${(e.padding || 0) * zoom}px`;
+    if (e.fill) el.style.background = e.fill;
+    if (e.border) el.style.border = `${Math.max(1, (e.thickness || 0.2) * zoom)}px solid ${e.color || '#222'}`;
+    if (e.rotate) { t.style.writingMode = 'vertical-rl'; if (e.rotate === 270) t.style.transform = 'rotate(180deg)'; t.style.textAlign = 'center'; }
+    el.append(t);
+  } else if (type === 'line') {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', Math.max(1, e.width * zoom)); svg.setAttribute('height', Math.max(1, e.height * zoom));
+    svg.style.overflow = 'visible'; svg.style.position = 'absolute'; svg.style.inset = '0';
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', 0); l.setAttribute('y1', 0); l.setAttribute('x2', e.width * zoom); l.setAttribute('y2', e.height * zoom);
+    l.setAttribute('stroke', e.color || '#222'); l.setAttribute('stroke-width', Math.max(1, (e.thickness || 0.2) * zoom));
+    svg.append(l); el.append(svg);
+    el.style.minHeight = '6px'; el.style.minWidth = '6px';
+  } else if (type === 'rect') {
+    el.style.border = `${Math.max(1, (e.thickness || 0.2) * zoom)}px solid ${e.color || '#222'}`;
+    if (e.fill) el.style.background = e.fill;
+  } else if (type === 'barcode') {
+    el.classList.add('barcode');
+  } else if (type === 'table') {
+    renderTablePreview(el, e);
+  } else if (type === 'list') {
+    el.classList.add('list'); el.style.overflow = 'visible';
+    const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = '⟲ ' + (e.source || 'source'); el.append(tag);
+    const ghost = document.createElement('div'); ghost.className = 'ghost';
+    ghost.style.top = (e.height + (e.gap || 0)) * zoom + 'px'; ghost.style.height = e.height * zoom + 'px';
+    el.append(ghost);
+    (e.items || []).forEach((c, ci) => el.append(renderElement(b, bi, c, [...path, ci])));
+  } else {
+    el.classList.add('ph'); el.textContent = type === 'qrcode' ? 'QR' : 'image';
+  }
+  el.onpointerdown = ev => startMove(ev, bi, path);
+  if (isSel && multi.length < 2) addHandles(el, bi, path, type);
+  return el;
+}
+
+function renderTablePreview(el, e) {
+  const cols = e.columns || [], widths = colWidths(e);
+  const rh = e.rowHeight || 5, hh = e.headerHeight || rh;
+  el.classList.add('tbl'); el.style.overflow = 'visible';
+  let y = 0;
+  const addRow = (texts, h, bold, fill, expr) => {
+    let x = 0;
+    cols.forEach((c, i) => {
+      const cell = document.createElement('div'); cell.className = 'cell' + (expr ? ' expr' : '');
+      cell.style.cssText += `left:${x * zoom}px;top:${y * zoom}px;width:${widths[i] * zoom}px;height:${h * zoom}px;`;
+      cell.style.fontSize = (e.fontSize || 10) * MM_PER_PT * zoom + 'px';
+      cell.style.fontWeight = bold ? '700' : (e.bold ? '700' : '400');
+      cell.style.padding = `0 ${(e.padding || 0) * zoom}px`;
+      cell.style.justifyContent = c.align === 'right' ? 'flex-end' : c.align === 'center' ? 'center' : 'flex-start';
+      if (e.border) cell.style.border = `${Math.max(1, (e.thickness || 0.2) * zoom)}px solid ${e.color || '#222'}`;
+      if (fill) cell.style.background = fill;
+      cell.textContent = texts[i] ?? '';
+      el.append(cell); x += widths[i];
+    });
+    y += h;
+  };
+  if (e.showHeader !== false) addRow(cols.map(c => c.header || ''), hh, true, e.fill, false);
+  if (e.rows) e.rows.forEach((r, ri) => addRow(cols.map((_, i) => String(r[i] ?? '').replace(/^=/, '{') + (String(r[i] ?? '').startsWith('=') ? '}' : '')), rh, false, ri % 2 && e.altFill, false));
+  else for (let ri = 0; ri < 2; ri++) addRow(cols.map(c => c.expression ? '{' + c.expression + '}' : (c.text || '')), rh, false, ri % 2 && e.altFill, true);
+  el.style.height = Math.max(y, 1) * zoom + 'px';
+}
+
+const HANDLES = { nw: [0, 0], n: [.5, 0], ne: [1, 0], e: [1, .5], se: [1, 1], s: [.5, 1], sw: [0, 1], w: [0, .5] };
+function addHandles(el, bi, path, type) {
+  for (const [dir, [fx, fy]] of Object.entries(HANDLES)) {
+    if (type === 'table' && dir !== 'e' && dir !== 'w') continue;   // a table is as tall as its rows
+    const h = document.createElement('div'); h.className = 'handle'; h.dataset.dir = dir;
+    h.style.left = `calc(${fx * 100}% - 4px)`; h.style.top = `calc(${fy * 100}% - 4px)`;
+    h.style.cursor = dir + '-resize';
+    h.onpointerdown = ev => startResize(ev, bi, path, dir);
+    el.append(h);
+  }
+}
+
+// ---------------------------------------------------------------- pointer interactions
+function drag(ev, onMove) {
+  ev.preventDefault(); ev.stopPropagation();
+  const sx = ev.clientX, sy = ev.clientY;
+  const move = m => onMove((m.clientX - sx) / zoom, (m.clientY - sy) / zoom, m);
+  const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); commit(); renderProps(); };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+}
+function startMove(ev, bi, path) {
+  if (ev.button !== 0) return;
+  if (ev.shiftKey || ev.ctrlKey || ev.metaKey) { ev.preventDefault(); ev.stopPropagation(); toggleSel(bi, path); return; }
+  if (!inMulti(bi, path)) select({ kind: 'element', b: bi, path });
+  const items = selList().map(p => { const e = elAt(bi, p); return { e, x: e.x, y: e.y }; });
+  const minX = Math.min(...items.map(i => i.x)), minY = Math.min(...items.map(i => i.y)), lead = items[0];
+  drag(ev, (dx, dy, m) => {
+    const f = m.altKey ? round : snapv;
+    const ddx = Math.max(f(lead.x + dx) - lead.x, -minX), ddy = Math.max(f(lead.y + dy) - lead.y, -minY);
+    for (const i of items) { i.e.x = round(i.x + ddx); i.e.y = round(i.y + ddy); }
+    renderCanvas();
+  });
+}
+function startResize(ev, bi, path, dir) {
+  const e = elAt(bi, path), o = { ...e };
+  drag(ev, (dx, dy, m) => {
+    const s = m.altKey ? round : snapv;
+    if (dir.includes('e')) e.width = Math.max(0.5, s(o.width + dx));
+    if (dir.includes('s')) e.height = Math.max(0, s(o.height + dy));
+    if (dir.includes('w')) { const nx = Math.min(s(o.x + dx), o.x + o.width - 0.5); e.x = Math.max(0, nx); e.width = round(o.x + o.width - e.x); }
+    if (dir.includes('n')) { const ny = Math.min(s(o.y + dy), o.y + o.height); e.y = Math.max(0, ny); e.height = round(o.y + o.height - e.y); }
+    renderCanvas();
+  });
+}
+function startBandResize(ev, bi) {
+  select({ kind: 'band', b: bi });
+  const b = def.bands[bi], h0 = b.height;
+  drag(ev, (dx, dy) => { b.height = Math.max(1, snapv(h0 + dy)); renderCanvas(); });
+}
+
+// ---------------------------------------------------------------- selection + panels
+let multi = [];   // paths of the selected elements when more than one is selected (same band, same parent)
+const inMulti = (bi, path) => multi.length > 1 && sel.kind === 'element' && sel.b === bi && multi.some(p => samePath(p, path));
+const selList = () => sel.kind !== 'element' ? [] : multi.length > 1 ? multi : [sel.path];
+function select(s) { sel = s; multi = []; renderCanvas(); renderProps(); renderTools(); }
+function setMulti(bi, paths) {
+  if (!paths.length) { select({ kind: 'band', b: bi }); return; }
+  sel = { kind: 'element', b: bi, path: paths[paths.length - 1] }; multi = paths.length > 1 ? paths : [];
+  renderCanvas(); renderProps(); renderTools();
+}
+function toggleSel(bi, path) {
+  let list = sel.kind === 'element' && sel.b === bi && samePath(sel.path.slice(0, -1), path.slice(0, -1)) ? [...selList()] : [];
+  const i = list.findIndex(p => samePath(p, path));
+  if (i >= 0) list.splice(i, 1); else list.push(path);
+  setMulti(bi, list);
+}
+
+function renderTools() {
+  const r = $('rail'); r.textContent = '';
+  for (const type of ELEMENT_TYPES) {
+    const b = document.createElement('button'); b.className = 'rbtn'; b.innerHTML = ico(type);
+    b.dataset.tip = 'Add ' + type + ' (click or drag onto a band)'; b.setAttribute('aria-label', 'Add ' + type); b.onclick = () => addElement(type); r.append(b);
+    b.draggable = true;
+    b.ondragstart = ev => { ev.dataTransfer.setData('text/clio-type', type); ev.dataTransfer.setData('text/plain', type); ev.dataTransfer.effectAllowed = 'copy'; document.body.classList.add('dragging'); };
+    b.ondragend = () => { document.body.classList.remove('dragging'); document.querySelectorAll('.droptarget').forEach(x => x.classList.remove('droptarget')); };
+  }
+  const sep = document.createElement('div'); sep.className = 'sep'; r.append(sep);
+  const bm = document.createElement('button'); bm.className = 'rbtn'; bm.innerHTML = ico('layers');
+  bm.dataset.tip = 'Add band'; bm.setAttribute('aria-label', 'Add band');
+  bm.onclick = ev => {
+    ev.stopPropagation();
+    const menu = $('bandMenu'); if (!menu.hidden) { menu.hidden = true; return; }
+    menu.textContent = '';
+    menu.append(Object.assign(document.createElement('div'), { className: 'ttl', textContent: 'Add band' }));
+    for (const type of BAND_TYPES) {
+      const it = document.createElement('button'); it.innerHTML = `<i class="dot" style="background:${bandVar(type)}"></i>${type}`;
+      it.onclick = () => { menu.hidden = true; addBand(type); }; menu.append(it);
+    }
+    const rc = bm.getBoundingClientRect(); menu.style.left = rc.right + 8 + 'px'; menu.style.top = rc.top + 'px'; menu.hidden = false;
+  };
+  r.append(bm);
+}
+document.addEventListener('click', () => { $('bandMenu').hidden = true; });
+
+function elLabel(e) {
+  const t = e.type || 'text';
+  if (t === 'text') return e.text || (e.expression ? '{' + e.expression + '}' : 'text');
+  if (t === 'table') return 'table' + (e.source ? ' · ' + e.source : e.rows ? ' · fixed rows' : '');
+  if (t === 'list') return 'list · ' + (e.source || '');
+  return t + (e.expression ? ' · ' + e.expression : '');
+}
+function renderOutline() {
+  const o = $('outline'), keep = o.scrollTop; o.textContent = '';
+  const head = document.createElement('div'); head.className = 'ohead'; head.textContent = 'Structure'; o.append(head);
+  const root = document.createElement('div'); root.className = 'orow' + (sel.kind === 'report' ? ' sel' : '');
+  root.innerHTML = ico('page') + '<span class="lbl"></span><span class="meta"></span>';
+  root.querySelector('.lbl').textContent = def.name || 'Report';
+  root.querySelector('.meta').textContent = `${def.page.width}×${def.page.height}`;
+  root.onclick = () => select({ kind: 'report' }); o.append(root);
+  const walk = (items, bi, base, depth) => items.forEach((e, ei) => {
+    const path = [...base, ei];
+    const row = document.createElement('div');
+    row.className = 'orow oel' + (sel.kind === 'element' && sel.b === bi && samePath(sel.path, path) ? ' sel' : '');
+    row.style.paddingLeft = 8 + 14 + depth * 14 + 'px';
+    row.innerHTML = ico((e.type || 'text')) + '<span class="lbl"></span>';
+    row.querySelector('.lbl').textContent = elLabel(e);
+    row.onclick = () => select({ kind: 'element', b: bi, path });
+    o.append(row);
+    if (e.type === 'list') walk(e.items || [], bi, path, depth + 1);
+  });
+  def.bands.forEach((b, bi) => {
+    const row = document.createElement('div'); row.className = 'orow obnd' + (sel.kind !== 'report' && sel.b === bi && sel.kind === 'band' ? ' sel' : '');
+    row.innerHTML = `<i class="dot" style="background:${bandVar(b.type)}"></i><span class="lbl"></span><span class="meta"></span>`;
+    row.querySelector('.lbl').textContent = b.type + (b.group ? ' · ' + b.group : '');
+    row.querySelector('.meta').textContent = b.height + ' mm';
+    row.onclick = () => select({ kind: 'band', b: bi }); o.append(row);
+    walk(b.elements, bi, [], 0);
+  });
+  o.scrollTop = keep;
+}
+
+function updateStatus() {
+  let t = `Report · ${def.page.width} × ${def.page.height} mm · margin ${def.page.margin} mm`;
+  if (sel.kind === 'band') { const b = curBand(); t = `${b.type} band · height ${b.height} mm`; }
+  else if (sel.kind === 'element' && multi.length > 1) t = multi.length + ' elements selected';
+  else if (sel.kind === 'element') {
+    const e = curEl();
+    t = `${e.type || 'text'} · x ${e.x}  y ${e.y} · ${e.width} × ${e.height} mm`;
+  }
+  $('statSel').textContent = t;
+}
+
+function absX(bi, path) {
+  let x = def.page.margin, arr = def.bands[bi].elements;
+  for (const idx of path) { const el = arr[idx]; x += el.x; arr = el.items; }
+  return x;
+}
+function buildRuler() {
+  const w = def.page.width * zoom, r = document.createElement('div'); r.id = 'ruler'; r.style.width = w + 'px';
+  const minor = zoom >= 3 ? 1 : 5, line = 'linear-gradient(90deg, var(--tick) 1px, transparent 1px)';
+  r.style.backgroundImage = [line, line, line].join(',');
+  r.style.backgroundSize = `${minor * zoom}px 4px, ${5 * zoom}px 8px, ${10 * zoom}px 13px`;
+  r.style.backgroundPosition = 'left bottom, left bottom, left bottom'; r.style.backgroundRepeat = 'repeat-x';
+  const m = def.page.margin * zoom;
+  for (const [l, wd] of [[0, m], [w - m, m]]) { const d = document.createElement('div'); d.className = 'rm'; d.style.left = l + 'px'; d.style.width = wd + 'px'; r.append(d); }
+  const step = zoom >= 3 ? 10 : 20;
+  for (let mm = 0; mm <= def.page.width; mm += step) { const l = document.createElement('span'); l.className = 'rl'; l.style.left = mm * zoom + 3 + 'px'; l.textContent = mm; r.append(l); }
+  if (sel.kind === 'element') {
+    const e = curEl();
+    if (e) { const d = document.createElement('div'); d.className = 'rsel'; d.style.left = absX(sel.b, sel.path) * zoom + 'px'; d.style.width = Math.max(1, e.width * zoom) + 'px'; r.append(d); }
+  }
+  return r;
+}
+
+function addElement(type, at) {
+  let bi = at ? at.bi : sel.kind === 'report' ? def.bands.findIndex(b => b.type === 'detail') : sel.b;
+  if (bi < 0) bi = 0;
+  if (!def.bands[bi]) { toast('Add a band first'); return; }
+  const b = def.bands[bi];
+  // Inside a list (or on one of its items) the new element joins the list's item template.
+  let container = b.elements, basePath = [], parentW = bandWidth(b), parentH = b.height;
+  if (at && at.listPath) {
+    const l = elAt(bi, at.listPath); container = l.items = l.items || []; basePath = [...at.listPath]; parentW = l.width; parentH = l.height;
+  } else if (!at && sel.kind === 'element' && sel.b === bi) {
+    const cur = curEl();
+    if (cur.type === 'list') { container = cur.items = cur.items || []; basePath = [...sel.path]; parentW = cur.width; parentH = cur.height; }
+    else if (sel.path.length > 1) {
+      const parent = elAt(bi, sel.path.slice(0, -1));
+      container = parent.items; basePath = sel.path.slice(0, -1); parentW = parent.width; parentH = parent.height;
+    }
+  }
+  const base = { x: 0, y: 0, width: Math.min(40, parentW), height: Math.min(5, parentH) };
+  const proto = {
+    text: { ...base, text: 'Text' },
+    line: { type: 'line', x: 0, y: 0, width: Math.min(60, parentW), height: 0 },
+    rect: { type: 'rect', ...base, height: Math.min(10, parentH) },
+    barcode: { type: 'barcode', ...base, width: 50, height: Math.min(10, parentH), expression: 'code' },
+    qrcode: { type: 'qrcode', ...base, width: 20, height: 20, expression: 'code' },
+    image: { type: 'image', ...base, width: 30, height: 20, expression: 'image' },
+    table: { type: 'table', x: 0, y: 0, width: Math.min(120, parentW), height: 0, source: 'items' },
+    list: { type: 'list', x: 0, y: 0, width: Math.min(100, parentW), height: 8, source: 'lines',
+      items: [{ x: 0, y: 1, width: 60, height: 5, expression: 'name' }] }
+  }[type];
+  if (at) { proto.x = Math.max(0, Math.min(snapv(at.x), Math.max(0, parentW - Math.min(proto.width, parentW)))); proto.y = Math.max(0, Math.min(snapv(at.y), Math.max(0, parentH - proto.height))); }
+  ensureShape(proto);
+  container.push(proto);
+  commit(); select({ kind: 'element', b: bi, path: [...basePath, container.length - 1] });
+}
+function addBand(type) {
+  const rank = BAND_TYPES.indexOf(type);
+  let at = 0;
+  def.bands.forEach((b, i) => { if (BAND_TYPES.indexOf(b.type) <= rank) at = i + 1; });
+  const band = { type, height: 8, elements: [] };
+  if (type === 'groupHeader' || type === 'groupFooter') band.group = def.groups[0]?.name || '';
+  def.bands.splice(at, 0, band);
+  commit(); select({ kind: 'band', b: at });
+}
+function deleteSel() {
+  if (sel.kind === 'element' && multi.length > 1) {
+    const b = sel.b, c = containerAt(b, sel.path), base = sel.path.slice(0, -1);
+    [...multi].map(p => p[p.length - 1]).sort((x, y) => y - x).forEach(i => c.splice(i, 1));
+    commit(); select(base.length ? { kind: 'element', b, path: base } : { kind: 'band', b });
+  } else if (sel.kind === 'element') {
+    const b = sel.b, path = sel.path;
+    containerAt(b, path).splice(path[path.length - 1], 1);
+    commit();
+    select(path.length > 1 ? { kind: 'element', b, path: path.slice(0, -1) } : { kind: 'band', b });
+  }
+  else if (sel.kind === 'band') { def.bands.splice(sel.b, 1); commit(); select({ kind: 'report' }); }
+}
+function duplicateSel() {
+  if (sel.kind === 'element' && multi.length > 1) {
+    const container = containerAt(sel.b, sel.path), base = sel.path.slice(0, -1), out = [];
+    for (const p of multi) { const c = JSON.parse(JSON.stringify(elAt(sel.b, p))); c.x = round(c.x + 2); c.y = round(c.y + 2); container.push(c); out.push([...base, container.length - 1]); }
+    commit(); setMulti(sel.b, out);
+  } else if (sel.kind === 'element') {
+    const container = containerAt(sel.b, sel.path), c = JSON.parse(JSON.stringify(curEl()));
+    c.x = round(c.x + 2); c.y = round(c.y + 2); container.push(c);
+    commit(); select({ kind: 'element', b: sel.b, path: [...sel.path.slice(0, -1), container.length - 1] });
+  } else if (sel.kind === 'band') {
+    const c = JSON.parse(JSON.stringify(def.bands[sel.b])); def.bands.splice(sel.b + 1, 0, c);
+    commit(); select({ kind: 'band', b: sel.b + 1 });
+  }
+}
+function moveBand(dir) {
+  const i = sel.b, j = i + dir;
+  if (j < 0 || j >= def.bands.length) return;
+  [def.bands[i], def.bands[j]] = [def.bands[j], def.bands[i]];
+  commit(); select({ kind: 'band', b: j });
+}
+
+// property panel helpers
+function field(parent, label, kind, obj, key, opts = {}) {
+  const row = document.createElement('div'); row.className = 'row';
+  const lab = document.createElement('label'); lab.textContent = label; row.append(lab);
+  let input;
+  if (kind === 'select') {
+    input = document.createElement('select');
+    for (const o of opts.options) { const op = document.createElement('option'); op.value = o; op.textContent = o || '(none)'; input.append(op); }
+    input.value = obj[key] ?? opts.default ?? '';
+    input.onchange = () => { obj[key] = input.value || undefined; commit(); renderCanvas(); if (opts.rerender) renderProps(); };
+  } else if (kind === 'check') {
+    const sw = document.createElement('label'); sw.className = 'sw';
+    input = document.createElement('input'); input.type = 'checkbox'; input.checked = !!obj[key];
+    input.onchange = () => { obj[key] = input.checked; commit(); renderCanvas(); };
+    sw.append(input, document.createElement('i')); row.append(sw); parent.append(row); return input;
+  } else if (kind === 'number') {
+    input = document.createElement('input'); input.type = 'number'; input.step = opts.step ?? 0.5; input.value = obj[key] ?? opts.default ?? 0;
+    input.oninput = () => { if (input.value === '') return; obj[key] = parseFloat(input.value); renderCanvas(); };
+    input.onchange = () => { commit(); if (opts.rerender) renderProps(); };
+  } else if (kind === 'area') {
+    input = document.createElement('textarea'); input.value = obj[key] ?? ''; if (opts.placeholder) input.placeholder = opts.placeholder;
+    input.oninput = () => { obj[key] = input.value || undefined; renderCanvas(); };
+    input.onchange = () => commit();
+  } else {
+    input = document.createElement('input'); input.type = 'text'; input.value = obj[key] ?? '';
+    if (opts.placeholder) input.placeholder = opts.placeholder;
+    input.oninput = () => { obj[key] = input.value || undefined; if (opts.live !== false) renderCanvas(); };
+    input.onchange = () => { commit(); if (opts.rerender) renderProps(); };
+  }
+  row.append(input); parent.append(row); return input;
+}
+function h4(parent, text) { const h = document.createElement('h4'); h.textContent = text; parent.append(h); }
+function title(parent, text, badge, color) {
+  const d = document.createElement('div'); d.className = 'ptitle';
+  if (color) d.innerHTML = `<i class="dot" style="width:10px;height:10px;border-radius:3px;background:${color}"></i>`;
+  d.append(Object.assign(document.createElement('b'), { textContent: text }));
+  if (badge) d.append(Object.assign(document.createElement('span'), { className: 'badge', textContent: badge }));
+  parent.append(d);
+}
+function seg(parent, label, obj, key, items, dflt) {
+  const row = document.createElement('div'); row.className = 'row';
+  row.append(Object.assign(document.createElement('label'), { textContent: label }));
+  const box = document.createElement('div'); box.className = 'seg';
+  const cur = obj[key] ?? dflt;
+  for (const it of items) {
+    const b = document.createElement('button'); b.innerHTML = it.html; b.title = it.title || String(it.v);
+    if (cur === it.v) b.className = 'on';
+    b.onclick = () => { obj[key] = it.v; commit(); renderCanvas(); renderProps(); };
+    box.append(b);
+  }
+  row.append(box); parent.append(row);
+}
+function toggles(parent, label, obj, items) {
+  const row = document.createElement('div'); row.className = 'row';
+  row.append(Object.assign(document.createElement('label'), { textContent: label }));
+  const box = document.createElement('div'); box.className = 'seg';
+  for (const it of items) {
+    const b = document.createElement('button'); b.innerHTML = it.html; b.title = it.title; if (obj[it.key]) b.className = 'on';
+    b.onclick = () => { obj[it.key] = !obj[it.key]; commit(); renderCanvas(); renderProps(); };
+    box.append(b);
+  }
+  row.append(box); parent.append(row);
+}
+function xywh(parent, obj) {
+  const g = document.createElement('div'); g.className = 'xywh';
+  for (const [k, l] of [['x', 'X'], ['y', 'Y'], ['width', 'W'], ['height', 'H']]) {
+    const w = document.createElement('div'); w.className = 'num';
+    const input = document.createElement('input'); input.type = 'number'; input.step = 0.5; input.value = obj[k] ?? 0; input.title = k + ' (mm)';
+    input.oninput = () => { if (input.value === '') return; obj[k] = parseFloat(input.value); renderCanvas(); };
+    input.onchange = () => commit();
+    w.append(Object.assign(document.createElement('span'), { textContent: l }), input); g.append(w);
+  }
+  parent.append(g);
+}
+function colourField(p, label, obj, key) {
+  const row = document.createElement('div'); row.className = 'row';
+  const lab = document.createElement('label'); lab.textContent = label;
+  const wrap = document.createElement('div'); wrap.className = 'colour';
+  const txt = document.createElement('input'); txt.type = 'text'; txt.placeholder = '#RRGGBB'; txt.value = obj[key] ?? '';
+  const pick = document.createElement('input'); pick.type = 'color'; pick.value = /^#[0-9a-f]{6}$/i.test(obj[key] || '') ? obj[key] : '#000000';
+  const apply = v => { obj[key] = v || undefined; renderCanvas(); };
+  txt.oninput = () => apply(txt.value.trim()); txt.onchange = () => commit();
+  pick.oninput = () => { txt.value = pick.value; apply(pick.value); }; pick.onchange = () => commit();
+  wrap.append(txt, pick); row.append(lab, wrap); p.append(row);
+}
+function actions(p, ...btns) { const a = document.createElement('div'); a.className = 'actions'; a.append(...btns); p.append(a); }
+function btn(html, fn, cls) { const b = document.createElement('button'); b.className = cls || 'ghost'; b.innerHTML = html; b.onclick = fn; return b; }
+
+function multiProps(p) {
+  const list = selList().map(q => elAt(sel.b, q)), n = list.length;
+  title(p, 'Selection', n + ' elements');
+  const sec = (title, btns) => {
+    const h4 = document.createElement('h4'); h4.textContent = title; p.append(h4);
+    const row = document.createElement('div'); row.className = 'seg'; row.style.width = '100%';
+    for (const [label, fn, tip] of btns) { const b = document.createElement('button'); b.textContent = label; b.title = tip || label; b.style.flex = '1'; b.onclick = () => { fn(); commit(); renderCanvas(); renderProps(); }; row.append(b); }
+    p.append(row);
+  };
+  const minX = () => Math.min(...list.map(e => e.x)), maxR = () => Math.max(...list.map(e => e.x + e.width));
+  const minY = () => Math.min(...list.map(e => e.y)), maxB = () => Math.max(...list.map(e => e.y + e.height));
+  sec('Align', [
+    ['Left', () => { const v = minX(); list.forEach(e => e.x = v); }, 'Align left edges'],
+    ['Center', () => { const c = (minX() + maxR()) / 2; list.forEach(e => e.x = Math.max(0, round(c - e.width / 2))); }, 'Align horizontal centres'],
+    ['Right', () => { const v = maxR(); list.forEach(e => e.x = Math.max(0, round(v - e.width))); }, 'Align right edges'],
+  ]);
+  sec('', [
+    ['Top', () => { const v = minY(); list.forEach(e => e.y = v); }, 'Align top edges'],
+    ['Middle', () => { const c = (minY() + maxB()) / 2; list.forEach(e => e.y = Math.max(0, round(c - e.height / 2))); }, 'Align vertical centres'],
+    ['Bottom', () => { const v = maxB(); list.forEach(e => e.y = Math.max(0, round(v - e.height))); }, 'Align bottom edges'],
+  ]);
+  if (n > 2) sec('Distribute', [
+    ['Horizontally', () => { const o = [...list].sort((a, b) => a.x - b.x), gap = (maxR() - minX() - o.reduce((s, e) => s + e.width, 0)) / (n - 1); let x = minX(); o.forEach(e => { e.x = round(x); x += e.width + gap; }); }],
+    ['Vertically', () => { const o = [...list].sort((a, b) => a.y - b.y), gap = (maxB() - minY() - o.reduce((s, e) => s + e.height, 0)) / (n - 1); let y = minY(); o.forEach(e => { e.y = round(y); y += e.height + gap; }); }],
+  ]);
+  sec('Size', [
+    ['Same width', () => { const w = list[list.length - 1].width; list.forEach(e => e.width = w); }, 'Match the last selected'],
+    ['Same height', () => { const v = list[list.length - 1].height; list.forEach(e => e.height = v); }, 'Match the last selected'],
+  ]);
+  // Shared style: one proxy per kind, writes go to every selected element the property applies to.
+  const typeOf = e => e.type || 'text';
+  const group = (kinds, keys) => {
+    const targets = list.filter(e => kinds.includes(typeOf(e)));
+    if (!targets.length) return null;
+    return new Proxy(targets[0], {
+      get: (t, k) => t[k],
+      set: (t, k, v) => { for (const e of targets) if (keys.includes(k)) e[k] = v; return true; }
+    });
+  };
+  const TXT = ['fontSize', 'bold', 'italic', 'underline', 'align', 'vAlign', 'rotate', 'padding', 'wrap', 'fitBand', 'color', 'fill', 'border', 'thickness'];
+  const g = group(['text'], TXT);
+  if (g) {
+    h4(p, 'Text style (' + list.filter(e => typeOf(e) === 'text').length + ' text)');
+    field(p, 'Font size', 'number', g, 'fontSize', { step: 1 });
+    toggles(p, 'Emphasis', g, [{ key: 'bold', html: '<b>B</b>', title: 'Bold' }, { key: 'italic', html: '<i>I</i>', title: 'Italic' }, { key: 'underline', html: '<u>U</u>', title: 'Underline' }]);
+    seg(p, 'Align', g, 'align', [{ v: 'left', html: ico('alignL') }, { v: 'center', html: ico('alignC') }, { v: 'right', html: ico('alignR') }], 'left');
+    seg(p, 'Vertical', g, 'vAlign', [{ v: 'top', html: ico('vTop') }, { v: 'middle', html: ico('vMid') }, { v: 'bottom', html: ico('vBot') }], 'top');
+    field(p, 'Padding', 'number', g, 'padding');
+    field(p, 'Wrap text', 'check', g, 'wrap');
+  }
+  const gb = group(['text', 'line', 'rect'], ['color', 'fill', 'border', 'thickness']);
+  if (gb) {
+    h4(p, 'Colour & border');
+    colourField(p, 'Colour', gb, 'color');
+    if (list.some(e => ['text', 'rect'].includes(typeOf(e)))) colourField(p, 'Fill', gb, 'fill');
+    if (list.some(e => typeOf(e) === 'text')) field(p, 'Border', 'check', gb, 'border');
+    field(p, 'Thickness', 'number', gb, 'thickness', { step: 0.1, default: 0.2 });
+  }
+  const note = document.createElement('p'); note.className = 'hint';
+  note.textContent = 'Style fields show the first element value; changing one applies to every selected element it fits. Shift+click adds or removes; Del deletes; Ctrl+D duplicates.'; p.append(note);
+}
+function renderProps() {
+  const p = $('props'); p.textContent = '';
+  if (sel.kind === 'element' && multi.length > 1) multiProps(p);
+  else if (sel.kind === 'element') elementProps(p, curEl());
+  else if (sel.kind === 'band') bandProps(p, curBand());
+  else reportProps(p);
+}
+
+function elementProps(p, e) {
+  const t = e.type || 'text';
+  title(p, 'Element', t);
+  const typeInput = field(p, 'Type', 'select', e, 'type', { options: ELEMENT_TYPES, default: 'text' });
+  typeInput.onchange = () => { e.type = typeInput.value; ensureShape(e); commit(); renderCanvas(); renderProps(); };
+  h4(p, t === 'list' ? 'Position & item size (mm)' : 'Position & size (mm)');
+  xywh(p, e);
+  if (t === 'table') tableProps(p, e);
+  else if (t === 'list') listProps(p, e);
+  else if (t === 'text') {
+    h4(p, 'Content');
+    field(p, 'Text', 'area', e, 'text');
+    field(p, 'Expression', 'area', e, 'expression', { placeholder: "e.g. Format(qty, 'N0')" });
+    h4(p, 'Style');
+    field(p, 'Font size', 'number', e, 'fontSize', { step: 1 });
+    toggles(p, 'Emphasis', e, [{ key: 'bold', html: '<b>B</b>', title: 'Bold' }, { key: 'italic', html: '<i>I</i>', title: 'Italic' },
+      { key: 'underline', html: '<u>U</u>', title: 'Underline' }]);
+    seg(p, 'Align', e, 'align', [{ v: 'left', html: ico('alignL') }, { v: 'center', html: ico('alignC') }, { v: 'right', html: ico('alignR') }], 'left');
+    seg(p, 'Vertical', e, 'vAlign', [{ v: 'top', html: ico('vTop') }, { v: 'middle', html: ico('vMid') }, { v: 'bottom', html: ico('vBot') }], 'top');
+    seg(p, 'Rotate', e, 'rotate', [{ v: 0, html: '0°' }, { v: 90, html: '90°' }, { v: 270, html: '270°' }], 0);
+    field(p, 'Padding', 'number', e, 'padding');
+    h4(p, 'Box');
+    colourField(p, 'Text colour', e, 'color'); colourField(p, 'Fill', e, 'fill');
+    field(p, 'Border', 'check', e, 'border');
+    field(p, 'Thickness', 'number', e, 'thickness', { step: 0.1, default: 0.2 });
+    h4(p, 'Layout');
+    field(p, 'Wrap text', 'check', e, 'wrap'); field(p, 'Fit band', 'check', e, 'fitBand');
+  } else if (t === 'line' || t === 'rect') {
+    h4(p, 'Style');
+    colourField(p, 'Colour', e, 'color');
+    field(p, 'Thickness', 'number', e, 'thickness', { step: 0.1, default: 0.2 });
+    if (t === 'rect') colourField(p, 'Fill', e, 'fill');
+  } else {
+    h4(p, 'Content');
+    field(p, 'Expression', 'area', e, 'expression');
+    seg(p, 'Align', e, 'align', [{ v: 'left', html: ico('alignL') }, { v: 'center', html: ico('alignC') }, { v: 'right', html: ico('alignR') }], 'left');
+    if (t === 'barcode') p.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: 'Code 128. Leave blank space around it and add a text element for the readable number.' }));
+    if (t === 'qrcode') p.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: 'Square, side = the smaller of width and height. Print at 20 mm or more.' }));
+  }
+  actions(p, btn(ico('copy') + 'Duplicate', duplicateSel), btn(ico('trash') + 'Delete', deleteSel, 'ghost danger'),
+    btn(ico('back') + (sel.path.length > 1 ? 'List' : 'Band'),
+      () => select(sel.path.length > 1 ? { kind: 'element', b: sel.b, path: sel.path.slice(0, -1) } : { kind: 'band', b: sel.b })));
+}
+
+function tableProps(p, e) {
+  h4(p, 'Columns');
+  const cols = e.columns = e.columns || [];
+  cols.forEach((c, i) => {
+    const box = document.createElement('div'); box.className = 'card';
+    field(box, 'Header', 'text', c, 'header');
+    field(box, 'Expression', 'text', c, 'expression', { placeholder: e.rows ? '(rows mode: not used)' : 'field or expression' });
+    field(box, 'Width (mm)', 'number', c, 'width'); box.lastChild.querySelector('input').title = '0 = share the remaining width';
+    seg(box, 'Align', c, 'align', [{ v: 'left', html: ico('alignL') }, { v: 'center', html: ico('alignC') }, { v: 'right', html: ico('alignR') }], 'left');
+    const a = document.createElement('div'); a.className = 'actions'; a.style.marginTop = '4px';
+    a.append(btn(ico('up'), () => { if (i) { [cols[i - 1], cols[i]] = [cols[i], cols[i - 1]]; commit(); renderCanvas(); renderProps(); } }, 'ghost icon'),
+      btn(ico('down'), () => { if (i < cols.length - 1) { [cols[i + 1], cols[i]] = [cols[i], cols[i + 1]]; commit(); renderCanvas(); renderProps(); } }, 'ghost icon'),
+      btn(ico('trash') + 'Remove', () => { cols.splice(i, 1); if (e.rows) e.rows.forEach(r => r.splice(i, 1)); commit(); renderCanvas(); renderProps(); }, 'danger'));
+    box.append(a); p.append(box);
+  });
+  p.append(btn(ico('plus') + 'Column', () => { cols.push({ header: 'Column' + (cols.length + 1), expression: 'field' }); commit(); renderCanvas(); renderProps(); }));
+
+  h4(p, 'Rows');
+  const mode = e.rows ? 'rows' : 'source';
+  const row = document.createElement('div'); row.className = 'row'; row.append(Object.assign(document.createElement('label'), { textContent: 'Data' }));
+  const sm = document.createElement('select'); sm.innerHTML = '<option value="source">collection (per row)</option><option value="rows">fixed rows</option>'; sm.value = mode;
+  sm.onchange = () => {
+    if (sm.value === 'rows') { e.rows = [cols.map(() => '')]; delete e.source; }
+    else { delete e.rows; e.source = e.source || 'items'; }
+    commit(); renderCanvas(); renderProps();
+  };
+  row.append(sm); p.append(row);
+  if (mode === 'source') {
+    field(p, 'Source', 'text', e, 'source', { placeholder: 'collection of the current row' });
+    p.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: 'Resolved with GetRows on the current row (child lines of a detail row) or the report root. Columns are expressions over each item.' }));
+  } else {
+    const wrap = document.createElement('div'); wrap.className = 'row';
+    wrap.append(Object.assign(document.createElement('label'), { textContent: 'Cells' }));
+    const ta = document.createElement('textarea'); ta.style.minHeight = '90px'; ta.placeholder = 'one row per line, cells split by |';
+    ta.value = e.rows.map(r => r.join(' | ')).join('\n');
+    ta.oninput = () => { e.rows = ta.value.split('\n').filter(l => l.length).map(l => l.split('|').map(x => x.trim())); renderCanvas(); };
+    ta.onchange = () => commit();
+    wrap.append(ta); p.append(wrap);
+    p.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: 'A cell starting with = is an expression, e.g. =Format(total, \'N0\').' }));
+  }
+  h4(p, 'Table style');
+  field(p, 'Row height', 'number', e, 'rowHeight', { default: 6 }); field(p, 'Header height', 'number', e, 'headerHeight');
+  field(p, 'Show header', 'check', e, 'showHeader'); if (e.showHeader === undefined) p.lastChild.querySelector('input').checked = true;
+  colourField(p, 'Header fill', e, 'fill'); colourField(p, 'Zebra fill', e, 'altFill');
+  field(p, 'Border', 'check', e, 'border'); field(p, 'Thickness', 'number', e, 'thickness', { step: 0.1, default: 0.2 });
+  field(p, 'Padding', 'number', e, 'padding');
+  field(p, 'Font size', 'number', e, 'fontSize', { step: 1 });
+  toggles(p, 'Emphasis', e, [{ key: 'bold', html: '<b>B</b>', title: 'Bold body' }, { key: 'italic', html: '<i>I</i>', title: 'Italic' }]);
+  colourField(p, 'Text colour', e, 'color');
+  field(p, 'Wrap text', 'check', e, 'wrap');
+  p.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: 'The table is as tall as its rows and grows its band. It cannot split across pages: for long data use a detail band.' }));
+}
+
+function listProps(p, e) {
+  h4(p, 'List');
+  field(p, 'Source', 'text', e, 'source', { placeholder: 'collection of the current row' });
+  field(p, 'Per row', 'number', e, 'across', { step: 1, default: 1 });
+  field(p, 'Gap (mm)', 'number', e, 'gap');
+  p.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: 'One item is drawn at the top-left with a ghost of the next. With this list (or an element inside it) selected, + element adds to the item. Elements see the fields of each item. Items have a fixed height (the H above).' }));
+}
+
+function bandProps(p, b) {
+  title(p, 'Band', b.type, bandVar(b.type));
+  field(p, 'Type', 'select', b, 'type', { options: BAND_TYPES, rerender: true });
+  field(p, 'Height (mm)', 'number', b, 'height');
+  if (b.type === 'groupHeader' || b.type === 'groupFooter')
+    field(p, 'Group', 'select', b, 'group', { options: def.groups.map(g => g.name) });
+  field(p, 'Visible if', 'text', b, 'visible', { placeholder: 'expression (optional)', live: false });
+  const hint = document.createElement('p'); hint.className = 'hint';
+  hint.textContent = { detail: 'Printed once per data row.', columnHeader: 'Printed after the report header and again on every new page.', pageHeader: 'Every page. Root fields and page numbers only.',
+    pageFooter: 'Every page. PageNumber and PageCount are available.', groupHeader: 'Printed when the group starts.', groupFooter: 'Printed when the group ends.',
+    reportHeader: 'Printed once at the start.', reportFooter: 'Printed once at the end.' }[b.type] || '';
+  p.append(hint);
+  actions(p, btn(ico('up') + 'Up', () => moveBand(-1)), btn(ico('down') + 'Down', () => moveBand(1)),
+    btn(ico('copy') + 'Duplicate', duplicateSel), btn(ico('trash') + 'Delete', deleteSel, 'ghost danger'));
+  actions(p, btn(ico('back') + 'Report settings', () => select({ kind: 'report' })));
+}
+
+function reportProps(p) {
+  title(p, 'Report', 'settings');
+  field(p, 'Name', 'text', def, 'name', { live: false });
+  field(p, 'Data source', 'text', def, 'dataSource', { live: false, placeholder: 'collection name' });
+  h4(p, 'Page (mm)');
+  const preset = document.createElement('div'); preset.className = 'row';
+  preset.append(Object.assign(document.createElement('label'), { textContent: 'Preset' }));
+  const sp = document.createElement('select');
+  sp.innerHTML = '<option value="">custom</option><option value="210x297">A4 portrait</option><option value="297x210">A4 landscape</option><option value="148x210">A5 portrait</option><option value="210x148">A5 landscape</option><option value="216x279">Letter portrait</option>';
+  sp.value = `${def.page.width}x${def.page.height}`; if (sp.selectedIndex === -1) sp.value = '';
+  sp.onchange = () => { if (!sp.value) return; const [w, h] = sp.value.split('x').map(Number); def.page.width = w; def.page.height = h; commit(); renderCanvas(); renderProps(); };
+  preset.append(sp); p.append(preset);
+  field(p, 'Width', 'number', def.page, 'width', { rerender: true }); field(p, 'Height', 'number', def.page, 'height', { rerender: true });
+  field(p, 'Margin', 'number', def.page, 'margin');
+  field(p, 'Columns', 'number', def.page, 'columns', { step: 1, default: 1 });
+  field(p, 'Column gap', 'number', def.page, 'columnGap');
+  p.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: `Body width ${round(bodyWidth())} mm. With columns > 1 the detail band becomes a cell.` }));
+
+  h4(p, 'Groups');
+  def.groups.forEach((g, i) => {
+    const box = document.createElement('div'); box.className = 'card';
+    field(box, 'Name', 'text', g, 'name', { live: false });
+    field(box, 'Expression', 'text', g, 'expression', { live: false });
+    field(box, 'New page', 'check', g, 'pageBreakBefore');
+    box.append(btn(ico('trash') + 'Remove', () => { def.groups.splice(i, 1); commit(); renderProps(); }, 'danger'));
+    p.append(box);
+  });
+  p.append(btn(ico('plus') + 'Group', () => { def.groups.push({ name: 'group' + (def.groups.length + 1), expression: 'field' }); commit(); renderProps(); }));
+
+  h4(p, 'Aggregates');
+  def.aggregates.forEach((a, i) => {
+    const box = document.createElement('div'); box.className = 'card';
+    field(box, 'Name', 'text', a, 'name', { live: false });
+    field(box, 'Function', 'select', a, 'function', { options: FUNCTIONS, default: 'sum' });
+    field(box, 'Expression', 'text', a, 'expression', { live: false });
+    field(box, 'Reset on', 'select', a, 'group', { options: ['', ...def.groups.map(g => g.name)] });
+    box.append(btn(ico('trash') + 'Remove', () => { def.aggregates.splice(i, 1); commit(); renderProps(); }, 'danger'));
+    p.append(box);
+  });
+  p.append(btn(ico('plus') + 'Aggregate', () => { def.aggregates.push({ name: 'total', function: 'sum', expression: 'qty' }); commit(); renderProps(); }));
+}
+
+function initChrome() {
+  $('logo').innerHTML = ico('logo');
+  $('bNew').innerHTML = ico('new') + 'New'; $('bOpen').innerHTML = ico('open') + 'Open';
+  $('bSave').innerHTML = ico('save') + 'Save'; $('bSaveAs').innerHTML = ico('saveas'); $('bSaveAs').title = 'Save as…';
+  $('bUndo').innerHTML = ico('undo'); $('bRedo').innerHTML = ico('redo');
+  $('zOut').innerHTML = ico('minus'); $('zIn').innerHTML = ico('plus'); $('bJson').innerHTML = ico('json') + 'JSON';
+  showZoom();
+}
+function showZoom() { $('zval').title = 'Click to fit the page width'; $('zval').textContent = Math.round(zoom / 4 * 100) + '%'; }
+function stepZoom(d) {
+  zoom = Math.min(12, Math.max(1.5, zoom * (d > 0 ? 1.15 : 1 / 1.15))); showZoom(); renderCanvas();
+}
+function fitZoom() {
+  const room = $("stage").clientWidth - 210 - 44;
+  if (room > 100) zoom = Math.min(8, Math.max(1.5, room / def.page.width));
+  showZoom(); renderCanvas();
+}
+
+function renderAll() { renderTools(); renderCanvas(); renderProps(); refreshButtons(); $('fileName').textContent = fileName || 'Untitled report'; }
+
+// ---------------------------------------------------------------- files
+function load(text, name, handle) {
+  let raw;
+  try { raw = JSON.parse(text); } catch (e) { toast('Not valid JSON: ' + e.message); return false; }
+  if (!raw || !Array.isArray(raw.bands)) { toast('This does not look like a ClioReport definition.'); return false; }
+  def = normalize(raw); sel = { kind: 'report' }; undoStack = []; redoStack = []; lastSnap = JSON.stringify(def);
+  fileName = name || ''; fileHandle = handle || null; savedSnap = lastSnap;
+  renderAll(); fitZoom(); return true;
+}
+const serialize = () => JSON.stringify(clean(def), null, 2) + '\n';
+async function saveAs() {
+  const text = serialize();
+  if (window.showSaveFilePicker) {
+    try {
+      const h = await window.showSaveFilePicker({ suggestedName: (def.name || 'report') + '.json', types: [{ description: 'ClioReport JSON', accept: { 'application/json': ['.json'] } }] });
+      const w = await h.createWritable(); await w.write(text); await w.close();
+      fileHandle = h; fileName = h.name; savedSnap = lastSnap; renderAll(); toast('Saved'); return;
+    } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = (def.name || 'report') + '.json'; a.click(); URL.revokeObjectURL(a.href); savedSnap = lastSnap; refreshButtons(); toast('Downloaded');
+}
+async function save() {
+  if (!fileHandle) return saveAs();
+  try { const w = await fileHandle.createWritable(); await w.write(serialize()); await w.close(); savedSnap = lastSnap; refreshButtons(); toast('Saved'); }
+  catch (e) { return saveAs(); }
+}
+async function openFile() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [h] = await window.showOpenFilePicker({ types: [{ description: 'ClioReport JSON', accept: { 'application/json': ['.json'] } }] });
+      const f = await h.getFile(); load(await f.text(), f.name, h); return;
+    } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  $('fileInput').click();
+}
+$('fileInput').onchange = async ev => { const f = ev.target.files[0]; if (f) load(await f.text(), f.name, null); ev.target.value = ''; };
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', async e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) load(await f.text(), f.name, null); });
+
+// ---------------------------------------------------------------- wiring
+$('bNew').onclick = () => { if (undoStack.length && !confirm('Discard unsaved changes?')) return; def = blankReport(); sel = { kind: 'report' }; undoStack = []; redoStack = []; lastSnap = JSON.stringify(def); fileHandle = null; fileName = ''; savedSnap = lastSnap; renderAll(); fitZoom(); };
+$('bOpen').onclick = openFile; $('bSave').onclick = save; $('bSaveAs').onclick = saveAs;
+$('bUndo').onclick = undo; $('bRedo').onclick = redo;
+$('zval').onclick = fitZoom; $('zOut').onclick = () => stepZoom(-1); $('zIn').onclick = () => stepZoom(1);
+$('snap').onchange = ev => { snap = ev.target.checked; };
+$('bJson').onclick = () => { $('jsonText').value = serialize(); $('jsonErr').textContent = ''; $('jsonDlg').showModal(); };
+$('jsonClose').onclick = () => $('jsonDlg').close();
+$('jsonCopy').onclick = async () => { try { await navigator.clipboard.writeText($('jsonText').value); toast('Copied'); } catch (_) { $('jsonText').select(); } };
+$('jsonApply').onclick = () => {
+  try {
+    const raw = JSON.parse($('jsonText').value);
+    if (!raw || !Array.isArray(raw.bands)) throw new Error('"bands" array is missing');
+    def = normalize(raw); sel = { kind: 'report' }; commit(); renderAll(); $('jsonDlg').close();
+  } catch (e) { $('jsonErr').textContent = e.message; }
+};
+
+window.addEventListener('keydown', ev => {
+  const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+  const mod = ev.ctrlKey || ev.metaKey;
+  if (mod && ev.key.toLowerCase() === 's') { ev.preventDefault(); save(); return; }
+  if (typing) return;
+  if (mod && ev.key.toLowerCase() === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
+  else if (mod && (ev.key.toLowerCase() === 'y' || (ev.key.toLowerCase() === 'z' && ev.shiftKey))) { ev.preventDefault(); redo(); }
+  else if (mod && ev.key.toLowerCase() === 'd') { ev.preventDefault(); duplicateSel(); }
+  else if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); deleteSel(); }
+  else if (mod && ev.key.toLowerCase() === 'a' && sel.kind !== 'report') {
+    ev.preventDefault(); const bi = sel.b;
+    setMulti(bi, def.bands[bi].elements.map((_, i) => [i]));
+  }
+  else if (ev.key === 'Escape' && sel.kind === 'element') select(sel.path.length > 1 ? { kind: 'element', b: sel.b, path: sel.path.slice(0, -1) } : { kind: 'band', b: sel.b });
+  else if (sel.kind === 'element' && ev.key.startsWith('Arrow')) {
+    ev.preventDefault();
+    const step = ev.shiftKey ? 5 : 0.5, es = selList().map(p => elAt(sel.b, p));
+    const mx = ev.key === 'ArrowLeft' ? -step : ev.key === 'ArrowRight' ? step : 0, my = ev.key === 'ArrowUp' ? -step : ev.key === 'ArrowDown' ? step : 0;
+    const cx = Math.max(mx, -Math.min(...es.map(e => e.x))), cy = Math.max(my, -Math.min(...es.map(e => e.y)));
+    es.forEach(e => { e.x = round(e.x + cx); e.y = round(e.y + cy); });
+    commit(); renderCanvas(); renderProps();
+  }
+});
+
+// test hook + startup
+window.__designer = { get sel() { return sel; }, get multi() { return multi; }, get def() { return def; }, set def(v) { def = v; }, clean: () => clean(def), load, select, renderAll };
+initChrome();
+renderAll();
+fitZoom();
+</script>
+</body>
+</html>

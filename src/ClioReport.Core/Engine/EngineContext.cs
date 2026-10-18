@@ -14,4 +14,7 @@ internal sealed class EngineContext(IDataContext? row, IDataContext root, IReadO
     }
 
     public IEnumerable<IDataContext> GetRows(string source) => (row ?? root).GetRows(source);
+
+    /// <summary>Same variables and root, another row: used for the items of a list and the rows of a table.</summary>
+    public EngineContext WithRow(IDataContext other) => new(other, root, variables);
 }
