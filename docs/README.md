@@ -25,3 +25,17 @@
 - `type: "barcode"`: Code 128 of the element's expression/text, drawn as bars scaled to the element `width` (set C for digit-only text of 4+ even digits, set B for printable ASCII; anything else is a `ReportException`). Leave a quiet zone (about 10 modules of blank space) around it and keep the width at or above ~0.25 mm per module (`Code128.Encode(text).Length` gives the module count). It does not print the human-readable text: add a normal text element for that.
 - `type: "image"`: the expression's value is the image. A `byte[]` (PNG, JPEG or BMP) is used directly; a string is a file path, which the PDF renderer only loads when `PdfRenderOptions.ImageRoot` is set and the path stays inside that folder. The image keeps its aspect ratio, fits inside the element box and follows `align`.
 - Numbers print with invariant culture; use `Format(x, 'N0')` for thousands separators.
+
+## Importing .rdlc (`ClioReport.Rdlc`)
+
+```csharp
+var result = RdlcImporter.ImportFile("Report.rdlc");   // or Import(Stream) / ImportXml(string)
+foreach (var w in result.Warnings) Console.WriteLine(w);
+File.WriteAllText("report.json", ReportSerializer.Serialize(result.Definition));
+```
+
+- Imported: page size and margin, page header/footer, text boxes (value, font, bold/italic/underline, colours, fill, border, padding, alignment, `Format`), lines, rectangles, and one Tablix: header rows -> `columnHeader`, row groups -> groups with header/footer bands, details row -> `detail`, other rows -> `reportFooter`. Items above the Tablix -> `reportHeader`, below -> `reportFooter`. `DataSetName` becomes `dataSource`.
+- Expressions: `Fields!X.Value`, `Parameters!X.Value`, `Globals!PageNumber/TotalPages`, `&`, comparison and logic operators, `Sum/Count/Avg/Min/Max` (turned into `aggregates`, scoped to the named group), `UCase/LCase/Trim/Len/Round/Abs/Format`. Anything else (e.g. `IIf`, `Now()`) is skipped with a warning; the text box is left empty.
+- Not imported (warned): images, charts, subreports, column groups, row-group header cells, several Tablix, conditional visibility, per-side borders (all sides are drawn), multiple paragraphs, `CanGrow` (set `wrap` yourself and pass an `ITextMeasurer`).
+- RDL 2005 `Table` is not read; open the file in Visual Studio and save it to upgrade it to Tablix.
+- Always review the result: the importer reports what it knows it skipped, not whether the layout looks right.

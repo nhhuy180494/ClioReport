@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Imports Microsoft Report Definition (.rdlc / .rdl) files into ClioReport definitions. Covers the common subset and reports what it skipped.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ClioReport.Core\ClioReport.Core.csproj" />
+  </ItemGroup>
+</Project>

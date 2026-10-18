@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Text elements: `underline` and `rotate` (0, 90, 270).
+- New package `ClioReport.Rdlc`: `RdlcImporter` converts an `.rdlc`/`.rdl` report (Tablix, row groups, page header/footer, text boxes, lines) into a `ReportDefinition` and lists what it skipped.
 
 ## 0.1.0-alpha.3
 

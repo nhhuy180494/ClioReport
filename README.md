@@ -66,6 +66,7 @@ The PDF package uses PDFsharp Core, which loads no fonts by itself. By default `
 
 - `src/ClioReport.Core`: JSON model, expression sandbox, layout engine, `IDataContext`. No dependencies.
 - `src/ClioReport.Pdf`: PDF renderer (PDFsharp), kept separate so Core stays dependency-free.
+- `src/ClioReport.Rdlc`: imports `.rdlc` reports (common subset, with warnings); see `docs/README.md`.
 - `tests/ClioReport.Tests`, `samples/PhieuXuatKho`, `docs`.
 
 ## Build
