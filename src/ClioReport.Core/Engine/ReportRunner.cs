@@ -122,6 +122,8 @@ internal sealed class ReportRunner
             {
                 if (KindOf(e.Type) is null)
                     throw new ReportException($"Unsupported element type '{e.Type}'.");
+                CheckColor(b, e.Color);
+                CheckColor(b, e.Fill);
                 if (e.FontSize < 0)
                     throw new ReportException("An element has a negative fontSize.");
                 if (e.Wrap && _measurer is null)
@@ -312,6 +314,14 @@ internal sealed class ReportRunner
         }
     }
 
+    private static void CheckColor(BandDefinition band, string? color)
+    {
+        if (color is null) return;
+        var digits = color.StartsWith('#') ? color[1..] : "";
+        if ((digits.Length != 3 && digits.Length != 6) || !digits.All(Uri.IsHexDigit))
+            throw new ReportException($"{band.Type} band: '{color}' is not a colour. Use #RGB or #RRGGBB.");
+    }
+
     private bool IsVisible(BandDefinition band, IDataContext ctx) =>
         string.IsNullOrWhiteSpace(band.Visible) || Values.Truthy(Eval(band.Visible, ctx));
 
@@ -400,7 +410,8 @@ internal sealed class ReportRunner
             var e = item.Def;
             page.Add(new RenderedElement(
                 _def.Page.Margin + e.X, top + e.Y, e.Width, item.Height, item.Text, e.Align, item.Kind,
-                e.Thickness, item.LineHeight, item.Image, new TextStyle(e.Bold, e.Italic, e.FontSize)));
+                e.Thickness, item.LineHeight, item.Image, new TextStyle(e.Bold, e.Italic, e.FontSize),
+                e.Color, e.Fill, e.Border));
         }
     }
 

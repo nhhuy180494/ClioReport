@@ -66,6 +66,15 @@ public sealed class ElementDefinition
     /// <summary>Font size in points; 0 uses the renderer's default size.</summary>
     public double FontSize { get; set; }
 
+    /// <summary>Text, line and outline colour as "#RGB" or "#RRGGBB". Default black.</summary>
+    public string? Color { get; set; }
+
+    /// <summary>Background colour of the element box ("#RGB" or "#RRGGBB"), for text and rect elements.</summary>
+    public string? Fill { get; set; }
+
+    /// <summary>Draws an outline (using <see cref="Thickness"/>) around a text element's box.</summary>
+    public bool Border { get; set; }
+
     /// <summary>Static text.</summary>
     public string? Text { get; set; }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Elements: `color`, `fill` and `border` for text, line and rect elements.
+
 ## 0.1.0-alpha.1
 
 First public preview.

@@ -44,6 +44,7 @@ public static class PdfReportRenderer
                         gfx.DrawLine(PenOf(e), rect.Left, rect.Top, rect.Right, rect.Bottom);
                         break;
                     case ElementKind.Rect:
+                        if (e.Fill is not null) gfx.DrawRectangle(BrushOf(e.Fill), rect);
                         gfx.DrawRectangle(PenOf(e), rect);
                         break;
                     case ElementKind.Barcode:
@@ -57,13 +58,16 @@ public static class PdfReportRenderer
                         break;
                     default:
                     {
+                        if (e.Fill is not null) gfx.DrawRectangle(BrushOf(e.Fill), rect);
+                        if (e.Border) gfx.DrawRectangle(PenOf(e), rect);
                         if (e.Text.Length == 0) break;
 
                         var font = fonts.Get(e.Style);
+                        var brush = e.Color is null ? XBrushes.Black : BrushOf(e.Color);
 
                         if (e.LineHeight <= 0)
                         {
-                            gfx.DrawString(e.Text, font, XBrushes.Black, rect, FormatOf(e.Align));
+                            gfx.DrawString(e.Text, font, brush, rect, FormatOf(e.Align));
                             break;
                         }
 
@@ -73,7 +77,7 @@ public static class PdfReportRenderer
                         {
                             if (lines[i].Length == 0) continue;
                             var lineRect = new XRect(rect.X, rect.Y + i * step, rect.Width, step);
-                            gfx.DrawString(lines[i], font, XBrushes.Black, lineRect, FormatOf(e.Align));
+                            gfx.DrawString(lines[i], font, brush, lineRect, FormatOf(e.Align));
                         }
                         break;
                     }
@@ -152,7 +156,19 @@ public static class PdfReportRenderer
         gfx.DrawImage(image, x, rect.Y, width, height);
     }
 
-    private static XPen PenOf(RenderedElement e) => new(XColors.Black, e.Thickness * PointsPerMm);
+    private static XPen PenOf(RenderedElement e) =>
+        new(e.Color is null ? XColors.Black : ColorOf(e.Color), e.Thickness * PointsPerMm);
+
+    private static XSolidBrush BrushOf(string color) => new(ColorOf(color));
+
+    /// <summary>The engine has already validated the colour as #RGB or #RRGGBB.</summary>
+    private static XColor ColorOf(string color)
+    {
+        var hex = color[1..];
+        if (hex.Length == 3) hex = string.Concat(hex.Select(c => new string(c, 2)));
+        return XColor.FromArgb(
+            Convert.ToInt32(hex[..2], 16), Convert.ToInt32(hex[2..4], 16), Convert.ToInt32(hex[4..], 16));
+    }
 
     private static XStringFormat FormatOf(TextAlign align) => align switch
     {

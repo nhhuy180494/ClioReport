@@ -40,4 +40,5 @@ public enum ElementKind
 public sealed record RenderedElement(
     double X, double Y, double Width, double Height, string Text,
     TextAlign Align = TextAlign.Left, ElementKind Kind = ElementKind.Text, double Thickness = 0.2,
-    double LineHeight = 0, byte[]? Image = null, TextStyle Style = default);
+    double LineHeight = 0, byte[]? Image = null, TextStyle Style = default,
+    string? Color = null, string? Fill = null, bool Border = false);

@@ -190,4 +190,20 @@ public class PdfReportRendererTests
         Assert.True(measurer.GetLineHeight(new TextStyle(FontSize: 20)) > measurer.GetLineHeight(default) * 1.9);
         Assert.Equal(measurer.MeasureWidth("abc"), measurer.MeasureWidth("abc", default));
     }
+
+    [Fact]
+    public void ColorFillAndBorder_AreRendered()
+    {
+        var fontPath = FontPath();
+        if (fontPath is null) return;
+        var options = new PdfRenderOptions { FontFilePath = fontPath };
+
+        var plain = RenderPdf("""{ "width": 40, "height": 6, "text": "x" }""", new { }, options);
+        var styled = RenderPdf(
+            """{ "width": 40, "height": 6, "text": "x", "color": "#C00", "fill": "#DDD", "border": true }""", new { }, options);
+        var rect = RenderPdf("""{ "type": "rect", "width": 40, "height": 6, "fill": "#0A0", "color": "#00C" }""", new { }, options);
+
+        Assert.True(styled.Length != plain.Length);
+        Assert.True(rect.Length > 100);
+    }
 }
