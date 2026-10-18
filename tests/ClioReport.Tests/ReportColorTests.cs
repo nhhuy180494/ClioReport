@@ -40,4 +40,31 @@ public class ReportColorTests
     [InlineData("123456")]
     public void InvalidColor_IsRejected(string color) =>
         Assert.Throws<ReportException>(() => Render($$"""{ "width": 20, "height": 5, "text": "x", "fill": "{{color}}" }"""));
+
+    [Fact]
+    public void Padding_IsCarried_AndNarrowsTheWrapWidth()
+    {
+        var def = ReportSerializer.Deserialize("""
+        {
+          "version": 1,
+          "bands": [ { "type": "reportHeader", "height": 5, "elements": [
+            { "width": 24, "height": 5, "wrap": true, "padding": 2, "text": "aaaa bbbb" } ] } ]
+        }
+        """);
+
+        // 24 mm box minus 2 * 2 mm padding = 20 mm = 10 characters: "aaaa bbbb" (9) still fits.
+        var fits = Assert.Single(Assert.Single(ReportEngine.Render(def, new DictionaryDataContext(), new FakeTextMeasurer()).Pages).Elements);
+        Assert.Equal(2, fits.Padding);
+        Assert.Equal("aaaa bbbb", fits.Text);
+
+        def.Bands[0].Elements[0].Padding = 4; // 16 mm = 8 characters: wraps
+        var wraps = Assert.Single(Assert.Single(ReportEngine.Render(def, new DictionaryDataContext(), new FakeTextMeasurer()).Pages).Elements);
+        Assert.Equal("aaaa\nbbbb", wraps.Text);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(10)]
+    public void InvalidPadding_IsRejected(double padding) =>
+        Assert.Throws<ReportException>(() => Render($$"""{ "width": 20, "height": 5, "text": "x", "padding": {{padding}} }"""));
 }

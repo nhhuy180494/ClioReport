@@ -19,6 +19,11 @@ internal sealed class ReportRunner
 
     private ILookup<(BandType, string), BandDefinition> _bands = null!;
     private List<BandDefinition> _pageHeaders = new();
+    private List<BandDefinition> _columnHeaders = new();
+    private double _columnHeaderHeight;
+    private bool _columnHeadersOn;
+    private double _contentTop;
+    private IDataContext _rootCtx = null!;
     private List<BandDefinition> _pageFooters = new();
     private double _footerHeight;
     private double _bodyTop;
@@ -40,6 +45,8 @@ internal sealed class ReportRunner
         var p = _def.Page;
         _pageHeaders = _def.Bands.Where(b => b.Type == BandType.PageHeader).ToList();
         _pageFooters = _def.Bands.Where(b => b.Type == BandType.PageFooter).ToList();
+        _columnHeaders = _def.Bands.Where(b => b.Type == BandType.ColumnHeader).ToList();
+        _columnHeaderHeight = _columnHeaders.Sum(b => b.Height);
         _footerHeight = _pageFooters.Sum(b => b.Height);
         _bodyTop = p.Margin + _pageHeaders.Sum(b => b.Height);
         _bodyBottom = p.Height - p.Margin - _footerHeight;
@@ -50,7 +57,15 @@ internal sealed class ReportRunner
 
         NewPage();
         var rootCtx = new EngineContext(null, _root, _vars);
+        _rootCtx = rootCtx;
         EmitBands(Bands(BandType.ReportHeader), rootCtx);
+
+        // Column headers start after the report header on page 1 and then open every new page.
+        _columnHeadersOn = true;
+        if (_cursor + _columnHeaderHeight > _bodyBottom + Epsilon)
+            NewPage();
+        else
+            EmitColumnHeaders();
 
         if (!string.IsNullOrWhiteSpace(_def.DataSource))
         {
@@ -94,6 +109,9 @@ internal sealed class ReportRunner
         var bodyHeight = _bodyBottom - _bodyTop;
         if (bodyHeight <= 0)
             throw new ReportException("Page header/footer bands leave no room for the page body.");
+        bodyHeight -= _columnHeaderHeight;
+        if (bodyHeight <= 0)
+            throw new ReportException("Column header bands leave no room for the page body.");
 
         var groupNames = new HashSet<string>(StringComparer.Ordinal);
         foreach (var g in _def.Groups)
@@ -114,7 +132,7 @@ internal sealed class ReportRunner
                 throw new ReportException($"{b.Type} band references unknown group '{b.Group}'.");
 
             var isPageBand = b.Type is BandType.PageHeader or BandType.PageFooter;
-            if (!isPageBand && b.Height > bodyHeight + Epsilon)
+            if (!isPageBand && b.Type != BandType.ColumnHeader && b.Height > bodyHeight + Epsilon)
                 throw new ReportException(
                     $"{b.Type} band (height {b.Height}) does not fit in the page body (height {bodyHeight}).");
 
@@ -122,6 +140,8 @@ internal sealed class ReportRunner
             {
                 if (KindOf(e.Type) is null)
                     throw new ReportException($"Unsupported element type '{e.Type}'.");
+                if (e.Padding < 0 || 2 * e.Padding >= e.Width)
+                    throw new ReportException($"{b.Type} band: padding must be at least 0 and less than half the element width.");
                 CheckColor(b, e.Color);
                 CheckColor(b, e.Fill);
                 if (e.FontSize < 0)
@@ -252,7 +272,7 @@ internal sealed class ReportRunner
     /// </summary>
     private void BreakBeforeGroups(int from)
     {
-        if (from >= _def.Groups.Count || _cursor <= _bodyTop + Epsilon) return;
+        if (from >= _def.Groups.Count || _cursor <= _contentTop + Epsilon) return;
 
         var forced = _lastCtx is not null && _def.Groups.Skip(from).Any(g => g.PageBreakBefore);
 
@@ -260,7 +280,7 @@ internal sealed class ReportRunner
         for (var i = from; i < _def.Groups.Count; i++)
             needed += Bands(BandType.GroupHeader, _def.Groups[i].Name).Sum(b => b.Height);
 
-        var fitsOnEmptyPage = needed <= _bodyBottom - _bodyTop + Epsilon;
+        var fitsOnEmptyPage = needed <= _bodyBottom - _bodyTop - _columnHeaderHeight + Epsilon;
         if (forced || (fitsOnEmptyPage && _cursor + needed > _bodyBottom + Epsilon))
             NewPage();
     }
@@ -291,6 +311,22 @@ internal sealed class ReportRunner
     {
         _pages.Add(new RenderedPage(_pages.Count + 1));
         _cursor = _bodyTop;
+        _contentTop = _cursor;
+        if (_columnHeadersOn) EmitColumnHeaders();
+    }
+
+    /// <summary>Column headers use root fields only; they grow like other bands but are not split.</summary>
+    private void EmitColumnHeaders()
+    {
+        foreach (var band in _columnHeaders)
+        {
+            if (!IsVisible(band, _rootCtx)) continue;
+
+            var items = Prepare(band, _rootCtx, out var height);
+            AddPrepared(_pages[^1], items, _cursor);
+            _cursor += height;
+        }
+        _contentTop = _cursor;
     }
 
     private void EmitBands(IEnumerable<BandDefinition> bands, IDataContext ctx)
@@ -301,7 +337,7 @@ internal sealed class ReportRunner
 
             var items = Prepare(band, ctx, out var height);
 
-            var bodyHeight = _bodyBottom - _bodyTop;
+            var bodyHeight = _bodyBottom - _bodyTop - _columnHeaderHeight;
             if (height > bodyHeight + Epsilon)
                 throw new ReportException(
                     $"{band.Type} band grew to {height:0.##} mm and does not fit in the page body ({bodyHeight:0.##} mm).");
@@ -366,7 +402,7 @@ internal sealed class ReportRunner
             if (kind == ElementKind.Text && e.Wrap && _measurer is not null)
             {
                 var style = new TextStyle(e.Bold, e.Italic, e.FontSize);
-                var lines = TextWrapper.Wrap(text, e.Width, _measurer, style);
+                var lines = TextWrapper.Wrap(text, e.Width - 2 * e.Padding, _measurer, style);
                 text = string.Join("\n", lines);
                 lineHeight = _measurer.GetLineHeight(style);
                 elementHeight = Math.Max(e.Height, lines.Count * lineHeight);
@@ -411,7 +447,7 @@ internal sealed class ReportRunner
             page.Add(new RenderedElement(
                 _def.Page.Margin + e.X, top + e.Y, e.Width, item.Height, item.Text, e.Align, item.Kind,
                 e.Thickness, item.LineHeight, item.Image, new TextStyle(e.Bold, e.Italic, e.FontSize),
-                e.Color, e.Fill, e.Border));
+                e.Color, e.Fill, e.Border, e.Padding));
         }
     }
 

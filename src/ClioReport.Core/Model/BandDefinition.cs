@@ -4,6 +4,7 @@ public enum BandType
 {
     ReportHeader,
     PageHeader,
+    ColumnHeader,
     GroupHeader,
     Detail,
     GroupFooter,
@@ -74,6 +75,9 @@ public sealed class ElementDefinition
 
     /// <summary>Draws an outline (using <see cref="Thickness"/>) around a text element's box.</summary>
     public bool Border { get; set; }
+
+    /// <summary>Horizontal padding in millimetres inside a text element's box (both sides). Wrapping uses the narrower width.</summary>
+    public double Padding { get; set; }
 
     /// <summary>Static text.</summary>
     public string? Text { get; set; }

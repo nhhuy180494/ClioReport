@@ -63,6 +63,7 @@ public static class PdfReportRenderer
                         if (e.Text.Length == 0) break;
 
                         var font = fonts.Get(e.Style);
+                        rect = new XRect(rect.X + e.Padding * PointsPerMm, rect.Y, rect.Width - 2 * e.Padding * PointsPerMm, rect.Height);
                         var brush = e.Color is null ? XBrushes.Black : BrushOf(e.Color);
 
                         if (e.LineHeight <= 0)
