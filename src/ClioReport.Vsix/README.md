@@ -3,7 +3,9 @@
 Opens ClioReport report files (`*.clio`, JSON inside) in the web designer inside Visual Studio, with PDF preview and RDLC import.
 
 - **Tools > ClioReport Designer** opens an empty designer (Save asks for a file name).
-- Right-click a `.clio` file in Solution Explorer > **Open in ClioReport Designer**. Each file gets its own tab; `Ctrl+S` in the designer writes the file. A dot in the tab title marks unsaved changes; closing the tab does **not** ask, so save first.
+- Double-click a `.clio` file in Solution Explorer (works in Folder View too), or right-click > **Open in ClioReport Designer**. Each file gets its own tab; `Ctrl+S` in the designer writes the file. A dot in the tab title marks unsaved changes; closing the tab does **not** ask, so save first.
+
+- **Add New Item > ClioReport Report** creates a blank `.clio` in C# projects (not available in Folder View).
 
 ## How it works
 
@@ -21,7 +23,7 @@ Needs Visual Studio 2022 or 2026 with the "Visual Studio extension development" 
 
 ```powershell
 cd src\ClioReport.Vsix
-.\build-vsix.ps1        # -> bin\Release\ClioReport.Vsix.vsix, double-click to install
+.\build-vsix.ps1        # -> bin\Release\net472\ClioReport.Vsix.vsix, double-click to install (uninstall the old version first)
 ```
 
 The project is not part of `ClioReport.sln` on purpose (`dotnet test` / `dotnet pack` do not need the VSIX tooling).

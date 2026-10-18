@@ -2,7 +2,14 @@
 
 ## Unreleased
 
-- `src/ClioReport.Vsix`: Visual Studio 2022 extension that opens report `.clio` files (JSON inside; `.json` still opens in the web designer) in the designer (WebView2, runs the designer host as a child process). Built with `build-vsix.ps1`; not part of `ClioReport.sln`.
+## 0.1.0-alpha.5 (2026-10-18)
+
+- `src/ClioReport.Vsix`: Visual Studio extension (2022 and newer; built with `build-vsix.ps1`, not part of `ClioReport.sln`; the `.vsix` is attached to the GitHub release). Report files use the `.clio` extension (JSON inside; `.json` still opens in the web designer).
+  - Double-click a `.clio` file in Solution Explorer (Solution view or Folder View) to open it in the designer; right-click > *Open in ClioReport Designer*; *Tools > ClioReport Designer* opens an empty report.
+  - *Add New Item > ClioReport Report* creates a blank `.clio` (C# projects).
+  - `Ctrl+S` writes the file; PDF preview and RDLC import work inside Visual Studio (WebView2, the designer host runs as a child process).
+- Designer: reports are saved as `.clio` by default.
+- RDLC import: `Image` items keep their position and size as `image` elements. A database image is bound to its field; an embedded image is bound to a field named after it (supply the picture as `byte[]`), with a warning, because images are data and are not stored in the report. Column groups (dynamic columns) are still not imported and are reported.
 
 ## 0.1.0-alpha.4 (2026-10-18)
 

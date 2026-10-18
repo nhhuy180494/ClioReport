@@ -451,13 +451,53 @@ public static class RdlcImporter
                     break;
                 }
                 case "Image":
-                    Warn($"Image '{name}' is not imported (use an image element bound to a field).");
+                    result.AddRange(ConvertImage(item, name, x, y, w, h, scope));
                     break;
                 default:
                     Warn($"{item.Name.LocalName} '{name}' is not supported and was skipped.");
                     break;
             }
             return result;
+        }
+
+        /// <summary>
+        /// Images are data, not part of the report definition, so every image keeps its place and size as an image element bound
+        /// to a field. Database images use their own field; an embedded image is bound to a field named after it.
+        /// </summary>
+        private List<ElementDefinition> ConvertImage(XElement item, string name, double x, double y, double w, double h, string? scope)
+        {
+            var source = Val(item, "Source");
+            var value = Val(item, "Value") ?? "";
+            var image = new ElementDefinition { Type = "image", X = x, Y = y, Width = w, Height = h };
+
+            if (source == "Embedded")
+            {
+                image.Expression = FieldName(value, name);
+                Warn($"Image '{name}': the embedded image '{value}' is not stored in the report. Its place is kept as an image bound to the field '{image.Expression}': supply the picture as a byte[] field with that name.");
+            }
+            else
+            {
+                string? translated;
+                string? problem = null;
+                if (value.StartsWith('=')) translated = _expr.Translate(value, scope, out problem);
+                else translated = "'" + value.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
+                if (translated is null)
+                {
+                    Warn($"Image '{name}': {problem}; the image was skipped.");
+                    return new List<ElementDefinition>();
+                }
+                image.Expression = translated;
+                if (source == "External")
+                    Warn($"Image '{name}': the image comes from a path or URL; set PdfRenderOptions.ImageRoot, or return a byte[] from the expression instead.");
+            }
+            return new List<ElementDefinition> { image };
+        }
+
+        private static string FieldName(string value, string fallback)
+        {
+            var chars = (string.IsNullOrWhiteSpace(value) ? fallback : value).Select(c => char.IsLetterOrDigit(c) || c == '_' ? c : '_').ToArray();
+            var name = new string(chars);
+            return name.Length > 0 && !char.IsDigit(name[0]) ? name : "image_" + name;
         }
 
         /// <summary>

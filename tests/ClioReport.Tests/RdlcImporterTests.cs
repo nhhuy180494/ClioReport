@@ -175,6 +175,38 @@ public class RdlcImporterTests
         Assert.Null(detail.Elements[0].Expression);
     }
 
+    private static string WithImage(string image)
+    {
+        var xml = Sample();
+        var at = xml.IndexOf("<ReportItems>", StringComparison.Ordinal) + "<ReportItems>".Length;
+        return xml.Insert(at, image);
+    }
+
+    [Fact]
+    public void Embedded_image_keeps_its_place_and_is_bound_to_a_field()
+    {
+        var xml = WithImage("<Image Name=\"Logo\"><Source>Embedded</Source><Value>company-logo</Value><Top>0cm</Top><Left>1cm</Left><Height>1.5cm</Height><Width>3cm</Width></Image>");
+        var result = RdlcImporter.ImportXml(xml);
+
+        var image = result.Definition.Bands.SelectMany(b => b.Elements).Single(e => e.Type == "image");
+        Assert.Equal("company_logo", image.Expression);
+        Assert.Equal(10, image.X, 1);
+        Assert.Equal(30, image.Width, 1);
+        Assert.Equal(15, image.Height, 1);
+        Assert.Contains(result.Warnings, w => w.Contains("company_logo") && w.Contains("byte[]"));
+    }
+
+    [Fact]
+    public void Database_image_uses_its_field()
+    {
+        var xml = WithImage("<Image Name=\"Pic\"><Source>Database</Source><Value>=Fields!photo.Value</Value><Top>0cm</Top><Left>0cm</Left><Height>1cm</Height><Width>1cm</Width></Image>");
+        var result = RdlcImporter.ImportXml(xml);
+
+        var image = result.Definition.Bands.SelectMany(b => b.Elements).Single(e => e.Type == "image");
+        Assert.Equal("photo", image.Expression);
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("Pic"));
+    }
+
     [Fact]
     public void NotAReport_Throws()
     {
