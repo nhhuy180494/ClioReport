@@ -1,4 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>PDF renderer for ClioReport (built on PDFsharp). Draws the pages produced by ClioReport.Core.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="PDFsharp" Version="6.1.1" />
   </ItemGroup>

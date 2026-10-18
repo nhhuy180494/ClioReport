@@ -4,7 +4,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <VersionPrefix>0.1.0</VersionPrefix>
-    <Authors>ClioReport contributors</Authors>
+    <VersionSuffix>alpha.1</VersionSuffix>
+    <Authors>nhhuy</Authors>
+    <Copyright>Copyright (c) 2026 nhhuy</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>report;reporting;report-builder;band;pdf;mes;wms</PackageTags>
+    <PackageProjectUrl>https://github.com/nhhuy180494/ClioReport</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nhhuy180494/ClioReport</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 </Project>
