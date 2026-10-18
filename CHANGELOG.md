@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `page.columns` and `page.columnGap`: multi-column detail layout for labels.
+
 ## 0.1.0-alpha.2
 
 - Band `columnHeader`: printed after the report header and again on every new page.

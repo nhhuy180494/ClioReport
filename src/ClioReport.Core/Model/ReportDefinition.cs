@@ -25,4 +25,13 @@ public sealed class PageSettings
     public double Width { get; set; } = 210;
     public double Height { get; set; } = 297;
     public double Margin { get; set; } = 10;
+
+    /// <summary>
+    /// Number of detail columns (labels). Above 1 the single detail band is repeated left to right, then top to
+    /// bottom, in cells of equal width; other bands stay full width.
+    /// </summary>
+    public int Columns { get; set; } = 1;
+
+    /// <summary>Space between detail columns in millimetres.</summary>
+    public double ColumnGap { get; set; }
 }

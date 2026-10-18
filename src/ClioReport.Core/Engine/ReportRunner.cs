@@ -23,6 +23,9 @@ internal sealed class ReportRunner
     private double _columnHeaderHeight;
     private bool _columnHeadersOn;
     private double _contentTop;
+    private int _colIndex;
+    private double _rowTop;
+    private double _rowHeight;
     private IDataContext _rootCtx = null!;
     private List<BandDefinition> _pageFooters = new();
     private double _footerHeight;
@@ -105,6 +108,16 @@ internal sealed class ReportRunner
         var p = _def.Page;
         if (p.Width <= 0 || p.Height <= 0 || p.Margin < 0 || p.Width - 2 * p.Margin <= 0)
             throw new ReportException("Invalid page size or margin.");
+
+        if (p.Columns < 1 || p.ColumnGap < 0)
+            throw new ReportException("Page columns must be at least 1 and columnGap cannot be negative.");
+        if (p.Columns > 1)
+        {
+            if (_def.Bands.Count(b => b.Type == BandType.Detail) != 1)
+                throw new ReportException("A report with several columns needs exactly one detail band.");
+            if (CellWidth <= 0)
+                throw new ReportException("The column gaps leave no room for the columns.");
+        }
 
         var bodyHeight = _bodyBottom - _bodyTop;
         if (bodyHeight <= 0)
@@ -272,6 +285,7 @@ internal sealed class ReportRunner
     /// </summary>
     private void BreakBeforeGroups(int from)
     {
+        if (from < _def.Groups.Count) FlushRow();
         if (from >= _def.Groups.Count || _cursor <= _contentTop + Epsilon) return;
 
         var forced = _lastCtx is not null && _def.Groups.Skip(from).Any(g => g.PageBreakBefore);
@@ -310,6 +324,8 @@ internal sealed class ReportRunner
     private void NewPage()
     {
         _pages.Add(new RenderedPage(_pages.Count + 1));
+        _colIndex = 0;
+        _rowHeight = 0;
         _cursor = _bodyTop;
         _contentTop = _cursor;
         if (_columnHeadersOn) EmitColumnHeaders();
@@ -329,11 +345,55 @@ internal sealed class ReportRunner
         _contentTop = _cursor;
     }
 
+    private double CellWidth =>
+        (_def.Page.Width - 2 * _def.Page.Margin - _def.Page.ColumnGap * (_def.Page.Columns - 1)) / _def.Page.Columns;
+
+    /// <summary>Ends the current row of detail cells: the next band starts below its tallest cell.</summary>
+    private void FlushRow()
+    {
+        if (_colIndex == 0) return;
+        _cursor += _rowHeight;
+        _colIndex = 0;
+        _rowHeight = 0;
+    }
+
+    private void EmitCell(BandDefinition band, IDataContext ctx)
+    {
+        var items = Prepare(band, ctx, out var height);
+        var bodyHeight = _bodyBottom - _bodyTop - _columnHeaderHeight;
+        if (height > bodyHeight + Epsilon)
+            throw new ReportException(
+                $"{band.Type} band grew to {height:0.##} mm and does not fit in the page body ({bodyHeight:0.##} mm).");
+
+        if (_colIndex == 0)
+        {
+            if (_cursor + height > _bodyBottom + Epsilon)
+                NewPage();
+            _rowTop = _cursor;
+        }
+        else if (_rowTop + Math.Max(_rowHeight, height) > _bodyBottom + Epsilon)
+        {
+            throw new ReportException("A detail cell grew taller than the space left on the page; give the band a larger height.");
+        }
+
+        AddPrepared(_pages[^1], items, _rowTop, _colIndex * (CellWidth + _def.Page.ColumnGap));
+        _rowHeight = Math.Max(_rowHeight, height);
+        if (++_colIndex == _def.Page.Columns) FlushRow();
+    }
+
     private void EmitBands(IEnumerable<BandDefinition> bands, IDataContext ctx)
     {
         foreach (var band in bands)
         {
             if (!IsVisible(band, ctx)) continue;
+
+            if (band.Type == BandType.Detail && _def.Page.Columns > 1)
+            {
+                EmitCell(band, ctx);
+                continue;
+            }
+
+            FlushRow();
 
             var items = Prepare(band, ctx, out var height);
 
@@ -439,13 +499,13 @@ internal sealed class ReportRunner
         }
     }
 
-    private void AddPrepared(RenderedPage page, List<PreparedElement> items, double top)
+    private void AddPrepared(RenderedPage page, List<PreparedElement> items, double top, double left = 0)
     {
         foreach (var item in items)
         {
             var e = item.Def;
             page.Add(new RenderedElement(
-                _def.Page.Margin + e.X, top + e.Y, e.Width, item.Height, item.Text, e.Align, item.Kind,
+                _def.Page.Margin + left + e.X, top + e.Y, e.Width, item.Height, item.Text, e.Align, item.Kind,
                 e.Thickness, item.LineHeight, item.Image, new TextStyle(e.Bold, e.Italic, e.FontSize),
                 e.Color, e.Fill, e.Border, e.Padding));
         }
