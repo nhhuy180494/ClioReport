@@ -42,4 +42,4 @@ public sealed record RenderedElement(
     TextAlign Align = TextAlign.Left, ElementKind Kind = ElementKind.Text, double Thickness = 0.2,
     double LineHeight = 0, byte[]? Image = null, TextStyle Style = default,
     string? Color = null, string? Fill = null, bool Border = false, double Padding = 0,
-    VerticalAlign VAlign = VerticalAlign.Top);
+    VerticalAlign VAlign = VerticalAlign.Top, bool Underline = false, int Rotate = 0);

@@ -62,6 +62,17 @@ public static class PdfReportRenderer
                         if (e.Border) gfx.DrawRectangle(PenOf(e), rect);
                         if (e.Text.Length == 0) break;
 
+                        var rotated = e.Rotate != 0;
+                        if (rotated)
+                        {
+                            // Draw in a box turned 90°: its width is the element height, centred on the element.
+                            gfx.Save();
+                            var cx = rect.X + rect.Width / 2;
+                            var cy = rect.Y + rect.Height / 2;
+                            gfx.RotateAtTransform(e.Rotate == 90 ? 90 : -90, new XPoint(cx, cy));
+                            rect = new XRect(cx - rect.Height / 2, cy - rect.Width / 2, rect.Height, rect.Width);
+                        }
+
                         var font = fonts.Get(e.Style);
                         rect = new XRect(rect.X + e.Padding * PointsPerMm, rect.Y, rect.Width - 2 * e.Padding * PointsPerMm, rect.Height);
                         var brush = e.Color is null ? XBrushes.Black : BrushOf(e.Color);
@@ -80,7 +91,9 @@ public static class PdfReportRenderer
                             if (lines[i].Length == 0) continue;
                             var lineRect = new XRect(rect.X, top + i * step, rect.Width, step);
                             DrawLine(gfx, fonts, lines[i], e, font, brush, lineRect);
+                            if (e.Underline) DrawUnderline(gfx, fonts, lines[i], e, font, brush, lineRect);
                         }
+                        if (rotated) gfx.Restore();
                         break;
                     }
                 }
@@ -113,6 +126,20 @@ public static class PdfReportRenderer
             gfx.DrawString(runs[i].Text, runs[i].Font, brush, new XRect(x, rect.Y, widths[i] + 1, rect.Height), XStringFormats.TopLeft);
             x += widths[i];
         }
+    }
+
+    private static void DrawUnderline(XGraphics gfx, FontCache fonts, string text, RenderedElement e, XFont font, XBrush brush, XRect rect)
+    {
+        var width = fonts.Runs(text, e.Style).Sum(r => gfx.MeasureString(r.Text, r.Font).Width);
+        var left = e.Align switch
+        {
+            TextAlign.Center => rect.X + (rect.Width - width) / 2,
+            TextAlign.Right => rect.Right - width,
+            _ => rect.X
+        };
+        var y = rect.Y + font.GetHeight() * 0.92;
+        var pen = new XPen(e.Color is null ? XColors.Black : ColorOf(e.Color), Math.Max(0.4, font.Size / 18));
+        gfx.DrawLine(pen, left, y, left + width, y);
     }
 
     private static void DrawBarcode(XGraphics gfx, RenderedElement e, XRect rect)

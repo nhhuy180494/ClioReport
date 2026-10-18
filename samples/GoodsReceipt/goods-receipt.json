@@ -129,6 +129,7 @@
           "bold": true,
           "align": "center",
           "vAlign": "middle",
+          "rotate": 270,
           "text": "Approval"
         },
         {
@@ -686,6 +687,7 @@
           "y": 35.05,
           "width": 120,
           "height": 4,
+          "underline": true,
           "text": "Remark:"
         }
       ]

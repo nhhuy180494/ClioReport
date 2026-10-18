@@ -79,6 +79,12 @@ public sealed class ElementDefinition
     /// <summary>Italic text. Without an italic font file the PDF renderer simulates it.</summary>
     public bool Italic { get; set; }
 
+    /// <summary>Underlined text.</summary>
+    public bool Underline { get; set; }
+
+    /// <summary>Rotates a text element's content: 0 (default), 90 (clockwise) or 270 (reads bottom to top). Rotated text is not wrapped.</summary>
+    public int Rotate { get; set; }
+
     /// <summary>Font size in points; 0 uses the renderer's default size.</summary>
     public double FontSize { get; set; }
 

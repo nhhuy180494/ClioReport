@@ -155,6 +155,8 @@ internal sealed class ReportRunner
                     throw new ReportException($"Unsupported element type '{e.Type}'.");
                 if (e.Padding < 0 || 2 * e.Padding >= e.Width)
                     throw new ReportException($"{b.Type} band: padding must be at least 0 and less than half the element width.");
+                if (e.Rotate is not (0 or 90 or 270))
+                    throw new ReportException($"{b.Type} band: rotate must be 0, 90 or 270.");
                 CheckColor(b, e.Color);
                 CheckColor(b, e.Fill);
                 if (e.FontSize < 0)
@@ -459,7 +461,7 @@ internal sealed class ReportRunner
 
             var elementHeight = e.Height;
             var lineHeight = 0.0;
-            if (kind == ElementKind.Text && e.Wrap && _measurer is not null)
+            if (kind == ElementKind.Text && e.Wrap && e.Rotate == 0 && _measurer is not null)
             {
                 var style = new TextStyle(e.Bold, e.Italic, e.FontSize);
                 var lines = TextWrapper.Wrap(text, e.Width - 2 * e.Padding, _measurer, style);
@@ -514,7 +516,7 @@ internal sealed class ReportRunner
             page.Add(new RenderedElement(
                 _def.Page.Margin + left + e.X, top + e.Y, e.Width, item.Height, item.Text, e.Align, item.Kind,
                 e.Thickness, item.LineHeight, item.Image, new TextStyle(e.Bold, e.Italic, e.FontSize),
-                e.Color, e.Fill, e.Border, e.Padding, e.VAlign));
+                e.Color, e.Fill, e.Border, e.Padding, e.VAlign, e.Underline, e.Rotate));
         }
     }
 

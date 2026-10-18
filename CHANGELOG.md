@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Text elements: `underline` and `rotate` (0, 90, 270).
+
 ## 0.1.0-alpha.3
 
 - `page.columns` and `page.columnGap`: multi-column detail layout for labels.
