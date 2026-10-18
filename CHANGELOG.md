@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-alpha.3
 
 - `page.columns` and `page.columnGap`: multi-column detail layout for labels.
 - Elements: `vAlign` and `fitBand` for table cells.
