@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-alpha.2
 
 - Band `columnHeader`: printed after the report header and again on every new page.
 - Elements: `color`, `fill` and `border` for text, line and rect elements; `padding` for text.
