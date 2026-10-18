@@ -1,0 +1,56 @@
+namespace ClioReport.Model;
+
+public enum BandType
+{
+    ReportHeader,
+    PageHeader,
+    GroupHeader,
+    Detail,
+    GroupFooter,
+    PageFooter,
+    ReportFooter
+}
+
+public enum TextAlign
+{
+    Left,
+    Center,
+    Right
+}
+
+public sealed class BandDefinition
+{
+    public BandType Type { get; set; }
+
+    /// <summary>Band height in millimetres.</summary>
+    public double Height { get; set; }
+
+    /// <summary>Group name for GroupHeader/GroupFooter bands.</summary>
+    public string? Group { get; set; }
+
+    public List<ElementDefinition> Elements { get; set; } = new();
+}
+
+public sealed class ElementDefinition
+{
+    /// <summary>Element kind: "text" (default), "line" or "rect".</summary>
+    public string Type { get; set; } = "text";
+
+    // Position/size relative to the band, in millimetres.
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+
+    /// <summary>Stroke width in millimetres for "line" and "rect".</summary>
+    public double Thickness { get; set; } = 0.2;
+
+    /// <summary>Horizontal alignment inside the element box.</summary>
+    public TextAlign Align { get; set; } = TextAlign.Left;
+
+    /// <summary>Static text.</summary>
+    public string? Text { get; set; }
+
+    /// <summary>Expression evaluated per row; takes precedence over <see cref="Text"/>.</summary>
+    public string? Expression { get; set; }
+}
