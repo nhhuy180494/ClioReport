@@ -28,6 +28,12 @@ public sealed class BandDefinition
     /// <summary>Group name for GroupHeader/GroupFooter bands.</summary>
     public string? Group { get; set; }
 
+    /// <summary>
+    /// Optional expression; the band is skipped when it is falsy (false, 0, empty text, null). For page header/footer
+    /// bands the space stays reserved and only the content is skipped.
+    /// </summary>
+    public string? Visible { get; set; }
+
     public List<ElementDefinition> Elements { get; set; } = new();
 }
 
@@ -50,6 +56,15 @@ public sealed class ElementDefinition
 
     /// <summary>Wrap text to the element width. The band grows to fit; requires an ITextMeasurer.</summary>
     public bool Wrap { get; set; }
+
+    /// <summary>Bold text. Without a bold font file the PDF renderer simulates it.</summary>
+    public bool Bold { get; set; }
+
+    /// <summary>Italic text. Without an italic font file the PDF renderer simulates it.</summary>
+    public bool Italic { get; set; }
+
+    /// <summary>Font size in points; 0 uses the renderer's default size.</summary>
+    public double FontSize { get; set; }
 
     /// <summary>Static text.</summary>
     public string? Text { get; set; }

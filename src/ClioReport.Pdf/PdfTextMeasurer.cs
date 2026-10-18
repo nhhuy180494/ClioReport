@@ -9,22 +9,27 @@ namespace ClioReport.Pdf;
 public sealed class PdfTextMeasurer : ITextMeasurer, IDisposable
 {
     private readonly XGraphics _gfx;
-    private readonly XFont _font;
+    private readonly FontCache _fonts;
 
     public PdfTextMeasurer(PdfRenderOptions? options = null)
     {
         options ??= new PdfRenderOptions();
         PdfReportRenderer.EnsureFontResolver(options);
 
-        _font = new XFont(options.FontFamily, options.FontSize);
+        _fonts = new FontCache(options);
         _gfx = XGraphics.CreateMeasureContext(new XSize(2000, 2000), XGraphicsUnit.Point, XPageDirection.Downwards);
-        LineHeight = _font.GetHeight() / PdfReportRenderer.PointsPerMm;
+        LineHeight = GetLineHeight(default);
     }
 
     public double LineHeight { get; }
 
-    public double MeasureWidth(string text) =>
-        _gfx.MeasureString(text, _font).Width / PdfReportRenderer.PointsPerMm;
+    public double MeasureWidth(string text) => MeasureWidth(text, default);
+
+    public double MeasureWidth(string text, TextStyle style) =>
+        _gfx.MeasureString(text, _fonts.Get(style)).Width / PdfReportRenderer.PointsPerMm;
+
+    public double GetLineHeight(TextStyle style) =>
+        _fonts.Get(style).GetHeight() / PdfReportRenderer.PointsPerMm;
 
     public void Dispose() => _gfx.Dispose();
 }

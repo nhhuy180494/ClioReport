@@ -14,6 +14,15 @@ public sealed class PdfRenderOptions
     /// </summary>
     public string? FontFilePath { get; set; }
 
+    /// <summary>Optional bold variant of <see cref="FontFilePath"/>. When null, bold is simulated.</summary>
+    public string? BoldFontFilePath { get; set; }
+
+    /// <summary>Optional italic variant of <see cref="FontFilePath"/>. When null, italic is simulated.</summary>
+    public string? ItalicFontFilePath { get; set; }
+
+    /// <summary>Optional bold italic variant of <see cref="FontFilePath"/>. When null, it is simulated.</summary>
+    public string? BoldItalicFontFilePath { get; set; }
+
     /// <summary>
     /// Folder that image elements may load files from when their value is a path (resolved against this folder;
     /// paths escaping it are rejected). Null disables path loading: supply images as byte[] instead.

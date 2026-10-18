@@ -122,6 +122,8 @@ internal sealed class ReportRunner
             {
                 if (KindOf(e.Type) is null)
                     throw new ReportException($"Unsupported element type '{e.Type}'.");
+                if (e.FontSize < 0)
+                    throw new ReportException("An element has a negative fontSize.");
                 if (e.Wrap && _measurer is null)
                     throw new ReportException("An element uses 'wrap' but no ITextMeasurer was passed to ReportEngine.Render.");
             }
@@ -152,6 +154,9 @@ internal sealed class ReportRunner
 
         foreach (var b in _def.Bands)
         {
+            if (!string.IsNullOrWhiteSpace(b.Visible))
+                Compile(b.Visible);
+
             foreach (var e in b.Elements)
             {
                 if (!string.IsNullOrWhiteSpace(e.Expression))
@@ -290,6 +295,8 @@ internal sealed class ReportRunner
     {
         foreach (var band in bands)
         {
+            if (!IsVisible(band, ctx)) continue;
+
             var items = Prepare(band, ctx, out var height);
 
             var bodyHeight = _bodyBottom - _bodyTop;
@@ -304,6 +311,9 @@ internal sealed class ReportRunner
             _cursor += height;
         }
     }
+
+    private bool IsVisible(BandDefinition band, IDataContext ctx) =>
+        string.IsNullOrWhiteSpace(band.Visible) || Values.Truthy(Eval(band.Visible, ctx));
 
     private sealed record PreparedElement(
         ElementDefinition Def, ElementKind Kind, string Text, double Height, double LineHeight, byte[]? Image);
@@ -345,9 +355,10 @@ internal sealed class ReportRunner
             var lineHeight = 0.0;
             if (kind == ElementKind.Text && e.Wrap && _measurer is not null)
             {
-                var lines = TextWrapper.Wrap(text, e.Width, _measurer);
+                var style = new TextStyle(e.Bold, e.Italic, e.FontSize);
+                var lines = TextWrapper.Wrap(text, e.Width, _measurer, style);
                 text = string.Join("\n", lines);
-                lineHeight = _measurer.LineHeight;
+                lineHeight = _measurer.GetLineHeight(style);
                 elementHeight = Math.Max(e.Height, lines.Count * lineHeight);
                 height = Math.Max(height, e.Y + elementHeight);
             }
@@ -389,7 +400,7 @@ internal sealed class ReportRunner
             var e = item.Def;
             page.Add(new RenderedElement(
                 _def.Page.Margin + e.X, top + e.Y, e.Width, item.Height, item.Text, e.Align, item.Kind,
-                e.Thickness, item.LineHeight, item.Image));
+                e.Thickness, item.LineHeight, item.Image, new TextStyle(e.Bold, e.Italic, e.FontSize)));
         }
     }
 
@@ -419,14 +430,14 @@ internal sealed class ReportRunner
             var y = p.Margin;
             foreach (var band in _pageHeaders)
             {
-                AddElements(page, band, ctx, y);
+                if (IsVisible(band, ctx)) AddElements(page, band, ctx, y);
                 y += band.Height;
             }
 
             y = p.Height - p.Margin - _footerHeight;
             foreach (var band in _pageFooters)
             {
-                AddElements(page, band, ctx, y);
+                if (IsVisible(band, ctx)) AddElements(page, band, ctx, y);
                 y += band.Height;
             }
         }

@@ -5,7 +5,7 @@ using PdfSharp.Pdf;
 
 namespace ClioReport.Pdf;
 
-/// <summary>Draws a <see cref="RenderedReport"/> to PDF: text, lines, rectangles, Code 128 barcodes and images. One font, no clipping.</summary>
+/// <summary>Draws a <see cref="RenderedReport"/> to PDF: text, lines, rectangles, Code 128 barcodes, QR codes and images. One font family (regular/bold/italic), no clipping.</summary>
 public static class PdfReportRenderer
 {
     internal const double PointsPerMm = 72.0 / 25.4;
@@ -26,7 +26,7 @@ public static class PdfReportRenderer
 
         using var images = new ImageCache(options);
         using var document = new PdfDocument();
-        var font = new XFont(options.FontFamily, options.FontSize);
+        var fonts = new FontCache(options);
 
         foreach (var rendered in report.Pages)
         {
@@ -58,6 +58,8 @@ public static class PdfReportRenderer
                     default:
                     {
                         if (e.Text.Length == 0) break;
+
+                        var font = fonts.Get(e.Style);
 
                         if (e.LineHeight <= 0)
                         {
@@ -171,8 +173,16 @@ public static class PdfReportRenderer
                     "No font available. Set PdfRenderOptions.FontFilePath to a .ttf file that covers your text " +
                     "(e.g. Arial), or assign GlobalFontSettings.FontResolver before rendering.");
 
-            GlobalFontSettings.FontResolver = new SingleFileFontResolver(path);
+            GlobalFontSettings.FontResolver = new SingleFileFontResolver(
+                path, ExistingOrNull(options.BoldFontFilePath), ExistingOrNull(options.ItalicFontFilePath),
+                ExistingOrNull(options.BoldItalicFontFilePath));
         }
+    }
+
+    private static string? ExistingOrNull(string? path)
+    {
+        if (path is null) return null;
+        return File.Exists(path) ? path : throw new FileNotFoundException("Font file not found.", path);
     }
 
     private static string? DefaultFontPath()

@@ -161,4 +161,33 @@ public class PdfReportRendererTests
             Directory.Delete(root, true);
         }
     }
+
+    [Fact]
+    public void BoldItalicAndFontSize_AreRendered()
+    {
+        var fontPath = FontPath();
+        if (fontPath is null) return;
+        var options = new PdfRenderOptions { FontFilePath = fontPath };
+
+        var pdf = RenderPdf(
+            """{ "width": 60, "height": 8, "bold": true, "italic": true, "fontSize": 16, "text": "Phiếu xuất kho" }""",
+            new { }, options);
+
+        Assert.True(pdf.Length > 100);
+    }
+
+    [Fact]
+    public void Measurer_UsesFontSize()
+    {
+        var fontPath = FontPath();
+        if (fontPath is null) return;
+        using var measurer = new PdfTextMeasurer(new PdfRenderOptions { FontFilePath = fontPath });
+
+        var small = measurer.MeasureWidth("Phiếu xuất kho", new TextStyle(FontSize: 10));
+        var large = measurer.MeasureWidth("Phiếu xuất kho", new TextStyle(FontSize: 20));
+
+        Assert.True(large > small * 1.9);
+        Assert.True(measurer.GetLineHeight(new TextStyle(FontSize: 20)) > measurer.GetLineHeight(default) * 1.9);
+        Assert.Equal(measurer.MeasureWidth("abc"), measurer.MeasureWidth("abc", default));
+    }
 }
