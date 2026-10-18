@@ -69,7 +69,7 @@ public static class RdlcImporter
 
             var def = new ReportDefinition { Version = 1 };
             ReadPage(root, def);
-            var pageNode = Child(root, "Page") ?? root;
+            var pageNode = PageElement(root) ?? root;
 
             var header = Child(pageNode, "PageHeader") ?? Child(root, "PageHeader");
             var footer = Child(pageNode, "PageFooter") ?? Child(root, "PageFooter");
@@ -80,9 +80,15 @@ public static class RdlcImporter
             if (footerBand is not null) def.Bands.Add(footerBand);
             if (footer is not null) def.Bands.Add(PageBand(BandType.PageFooter, footer));
 
+            if (_expr.FirstUsed)
+                Warn("First(...)/Last(...) calls were imported as plain fields. Supply those values as fields of the root object (in RDLC they come from a one-row dataset).");
             def.Aggregates.AddRange(_aggregates);
             return new RdlcImportResult(def, _warnings);
         }
+
+        // 2008 files keep <Page> directly under <Report>; 2010+ (what Visual Studio writes today) keep it in <ReportSection>.
+        private static XElement? PageElement(XElement root) =>
+            Child(root, "Page") ?? Child(Children(Child(root, "ReportSections"), "ReportSection").FirstOrDefault(), "Page");
 
         private void Warn(string message) => _warnings.Add(message);
 
@@ -90,7 +96,7 @@ public static class RdlcImporter
 
         private void ReadPage(XElement root, ReportDefinition def)
         {
-            var page = Child(root, "Page") ?? root;
+            var page = PageElement(root) ?? root;
             def.Page.Width = Length(page, "PageWidth", 8.5 * 25.4);
             def.Page.Height = Length(page, "PageHeight", 11 * 25.4);
             def.Page.Margin = Length(page, "LeftMargin", 0);
@@ -266,10 +272,10 @@ public static class RdlcImporter
             if (headerWidthByDepth.Values.Any(w => w > 0))
                 Warn("Row group header cells are not imported; the group columns are left blank.");
 
-            BandDefinition? Stack(BandType type, string? group, IEnumerable<int> indices, string? scopeGroup)
+            BandDefinition? Stack(BandType type, string? group, IEnumerable<int> indices, string? scopeGroup, double startY = 0)
             {
                 var elements = new List<ElementDefinition>();
-                double y = 0;
+                double y = startY;
                 foreach (var i in indices)
                 {
                     if (i >= rows.Count) continue;
@@ -284,7 +290,7 @@ public static class RdlcImporter
                         if (cell is not null)
                         {
                             if (cell.Name.LocalName == "Textbox")
-                                elements.Add(ConvertTextbox(cell, x, y, width, row.Height, scopeGroup));
+                                elements.AddRange(ConvertTextboxes(cell, x, y, width, row.Height, scopeGroup));
                             else
                                 elements.AddRange(ConvertItem(cell, x, y, scopeGroup));
                         }
@@ -297,8 +303,15 @@ public static class RdlcImporter
                     : new BandDefinition { Type = type, Group = group, Height = y, Elements = elements };
             }
 
-            var columnHeader = Stack(BandType.ColumnHeader, null, report.Headers, null);
-            if (columnHeader is not null) bands.Add(columnHeader);
+            // Column hierarchy members with a TablixHeader are the header cells above the columns (what the wizard writes for a plain
+            // table with spanning headers). They sit above any header rows of the row hierarchy.
+            var (columnHeaderCells, columnHeaderHeight) = ColumnHeaderCells(tablix, columns, left);
+            var columnHeader = Stack(BandType.ColumnHeader, null, report.Headers, null, columnHeaderHeight);
+            if (columnHeader is not null)
+            {
+                columnHeader.Elements.InsertRange(0, columnHeaderCells);
+                bands.Add(columnHeader);
+            }
             foreach (var scope in scopes)
             {
                 var band = Stack(BandType.GroupHeader, scope.Name, scope.Headers, scope.Name);
@@ -326,6 +339,82 @@ public static class RdlcImporter
             }
         }
 
+        private (List<ElementDefinition> Cells, double Height) ColumnHeaderCells(XElement tablix, List<double> columns, double left)
+        {
+            var cells = new List<ElementDefinition>();
+            var top = Children(Child(Child(tablix, "TablixColumnHierarchy"), "TablixMembers"), "TablixMember").ToList();
+
+            static List<XElement> Kids(XElement m) => Children(Child(m, "TablixMembers"), "TablixMember").ToList();
+            static bool HasHeader(XElement m) => Child(m, "TablixHeader") is not null || Kids(m).Any(HasHeader);
+            static int Leaves(XElement m) { var k = Kids(m); return k.Count == 0 ? 1 : k.Sum(Leaves); }
+            if (!top.Any(HasHeader)) return (cells, 0);
+
+            // A header's Size is its own height. A leaf header runs down to the body, so the band is as tall as the deepest chain of
+            // headers; the height of a level comes from the headers that have more headers beneath them.
+            static double Chain(XElement m, Func<XElement, double> size)
+            {
+                var below = Kids(m).Where(HasHeader).Select(k => Chain(k, size)).DefaultIfEmpty(0).Max();
+                return (Child(m, "TablixHeader") is { } h ? size(m) : 0) + below;
+            }
+            double Size(XElement m) => Length(Child(m, "TablixHeader"), "Size", 0);
+            var total = top.Where(HasHeader).Max(m => Chain(m, Size));
+
+            var levels = new List<double>();
+            void Measure(IEnumerable<XElement> members, int depth)
+            {
+                foreach (var m in members)
+                {
+                    var next = depth;
+                    if (Child(m, "TablixHeader") is not null)
+                    {
+                        if (Kids(m).Any(HasHeader))
+                        {
+                            while (levels.Count <= depth) levels.Add(0);
+                            levels[depth] = Math.Max(levels[depth], Size(m));
+                        }
+                        next = depth + 1;
+                    }
+                    Measure(Kids(m), next);
+                }
+            }
+            Measure(top, 0);
+            while (levels.Count < 8) levels.Add(0);
+
+            var leaf = 0;
+            void Emit(IEnumerable<XElement> members, int depth, double y)
+            {
+                foreach (var m in members)
+                {
+                    var header = Child(m, "TablixHeader");
+                    var kids = Kids(m);
+                    var start = leaf;
+                    var count = Leaves(m);
+                    var next = depth;
+                    var nextY = y;
+                    if (header is not null)
+                    {
+                        var content = Children(Child(header, "CellContents"), null).FirstOrDefault();
+                        var x = left + columns.Take(start).Sum();
+                        var width = columns.Skip(start).Take(count).Sum();
+                        // A header with more headers beneath it keeps its own level's height; a leaf runs down to the body.
+                        var height = kids.Any(HasHeader) ? levels[depth] : total - y;
+                        if (content is not null)
+                        {
+                            if (content.Name.LocalName == "Textbox") cells.AddRange(ConvertTextboxes(content, x, y, width, height, null));
+                            else cells.AddRange(ConvertItem(content, x, y, null));
+                        }
+                        next = depth + 1;
+                        nextY = y + levels[depth];
+                    }
+                    if (kids.Count == 0) leaf++;
+                    else Emit(kids, next, nextY);
+                }
+            }
+            Emit(top, 0, 0);
+            if (leaf != columns.Count) Warn($"The column headers cover {leaf} column(s) but the table has {columns.Count}; check the header layout.");
+            return (cells, total);
+        }
+
         // ---- report items -----------------------------------------------------------------------------------
 
         private List<ElementDefinition> ConvertItem(XElement item, double dx, double dy, string? scope)
@@ -340,7 +429,7 @@ public static class RdlcImporter
             switch (item.Name.LocalName)
             {
                 case "Textbox":
-                    result.Add(ConvertTextbox(item, x, y, w, h, scope));
+                    result.AddRange(ConvertTextboxes(item, x, y, w, h, scope));
                     break;
                 case "Line":
                 {
@@ -371,7 +460,53 @@ public static class RdlcImporter
             return result;
         }
 
-        private ElementDefinition ConvertTextbox(XElement tb, double x, double y, double w, double h, string? scope)
+        /// <summary>
+        /// One element per textbox, except when it is a stack of single-run paragraphs with different styles (a title with a
+        /// smaller red subtitle, say): ClioReport has one style per element, so each paragraph becomes its own element.
+        /// </summary>
+        private List<ElementDefinition> ConvertTextboxes(XElement tb, double x, double y, double w, double h, string? scope)
+        {
+            var paragraphs = Children(Child(tb, "Paragraphs"), "Paragraph").ToList();
+            bool Single(XElement p) => Children(Child(p, "TextRuns"), "TextRun").Count() == 1;
+            string StyleKey(XElement p)
+            {
+                var run = Children(Child(p, "TextRuns"), "TextRun").First();
+                var rs = Child(run, "Style");
+                return string.Join("|", new[] { "FontSize", "Color", "FontWeight", "FontStyle", "TextDecoration" }.Select(n => Val(rs, n) ?? Val(Child(p, "Style"), n) ?? ""));
+            }
+            if (paragraphs.Count > 1 && paragraphs.All(Single) && paragraphs.Select(StyleKey).Distinct().Count() > 1)
+            {
+                var full = ConvertTextbox(tb, x, y, w, h, scope, quiet: true);
+                var result = new List<ElementDefinition>();
+                if (full.Border || full.Fill is not null)
+                    result.Add(new ElementDefinition { X = x, Y = y, Width = w, Height = h, Border = full.Border, Fill = full.Fill, Thickness = full.Thickness });
+
+                var parts = new List<ElementDefinition>();
+                foreach (var paragraph in paragraphs)
+                {
+                    var copy = new XElement(tb);
+                    foreach (var other in Children(Child(copy, "Paragraphs"), "Paragraph").ToList())
+                        if (other.ToString() != paragraph.ToString()) other.Remove();
+                    var part = ConvertTextbox(copy, x, y, w, h, scope, quiet: false);
+                    part.Border = false; part.Fill = null;
+                    parts.Add(part);
+                }
+                // Stack the lines top to bottom using each line's font size; the box's vertical alignment places the stack.
+                double Line(ElementDefinition e) => (e.FontSize > 0 ? e.FontSize : 10) * 25.4 / 72 * 1.25;
+                var used = parts.Sum(Line);
+                var offset = full.VAlign switch { VerticalAlign.Middle => Math.Max(0, (h - used) / 2), VerticalAlign.Bottom => Math.Max(0, h - used), _ => 0 };
+                foreach (var part in parts)
+                {
+                    part.Y = y + offset; part.Height = Line(part); part.VAlign = VerticalAlign.Top;
+                    offset += part.Height;
+                }
+                result.AddRange(parts);
+                return result;
+            }
+            return new List<ElementDefinition> { ConvertTextbox(tb, x, y, w, h, scope) };
+        }
+
+        private ElementDefinition ConvertTextbox(XElement tb, double x, double y, double w, double h, string? scope, bool quiet = false)
         {
             var name = Attr(tb, "Name") ?? "Textbox";
             var e = new ElementDefinition { X = x, Y = y, Width = w, Height = h };
@@ -383,16 +518,26 @@ public static class RdlcImporter
             var paraStyle = paragraphs.Count > 0 ? Child(paragraphs[0], "Style") : null;
             string? Prop(string n) => Val(runStyle, n) ?? Val(paraStyle, n) ?? Val(tbStyle, n);
 
-            var values = runs.Count > 0
-                ? runs.Select(r => Val(r, "Value") ?? "").ToList()
-                : new List<string> { Val(tb, "Value") ?? "" };
-            if (paragraphs.Count > 1) Warn($"Textbox '{name}': several paragraphs are joined with a space.");
+            // Runs of one paragraph are concatenated; paragraphs are separated by a line break (marker "\u0002").
+            var values = new List<string>();
+            if (runs.Count > 0)
+            {
+                for (var pi = 0; pi < paragraphs.Count; pi++)
+                {
+                    if (pi > 0) values.Add("\u0002");
+                    values.AddRange(Children(Child(paragraphs[pi], "TextRuns"), "TextRun").Select(r => Val(r, "Value") ?? ""));
+                }
+            }
+            else values.Add(Val(tb, "Value") ?? "");
+            if (!quiet && runs.Count > 1 && runs.Select(r => Child(r, "Style")?.ToString() ?? "").Distinct().Count() > 1)
+                Warn($"Textbox '{name}': text with different styles inside one box uses the style of its first run.");
 
             var format = Prop("Format");
             var pieces = new List<string>();
             var anyExpression = false;
             foreach (var value in values)
             {
+                if (value == "\u0002") { pieces.Add("'\\n'"); continue; }
                 if (value.StartsWith('='))
                 {
                     var translated = _expr.Translate(value, scope, out var problem);
@@ -411,7 +556,7 @@ public static class RdlcImporter
             }
 
             if (!anyExpression)
-                e.Text = string.Join("", values.Where(v => !v.StartsWith('=')));
+                e.Text = string.Join("", values.Where(v => !v.StartsWith('=')).Select(v => v == "\u0002" ? "\n" : v));
             else
                 e.Expression = pieces.Count == 1 ? pieces[0][1..^1] : "'' + " + string.Join(" + ", pieces);
 

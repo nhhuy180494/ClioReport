@@ -18,6 +18,9 @@ internal sealed class RdlcExpression(List<AggregateDefinition> aggregates, HashS
     private static readonly HashSet<string> Supported = new(StringComparer.OrdinalIgnoreCase)
         { "Round", "Abs", "Min", "Max", "Upper", "Lower", "Trim", "Len", "IsNull", "Format" };
 
+    /// <summary>True once a First/Last(...) call was turned into a plain field reference.</summary>
+    public bool FirstUsed { get; private set; }
+
     private readonly Dictionary<string, string> _aggregateNames = new(StringComparer.Ordinal);
     private List<string> _literals = new();
 
@@ -63,6 +66,22 @@ internal sealed class RdlcExpression(List<AggregateDefinition> aggregates, HashS
         {
             var m = Aggregate.Match(s);
             if (!m.Success) break;
+
+            // First/Last(Fields!X.Value, "DataSet") reads one value of a (usually one-row) dataset: ClioReport keeps such values as
+            // plain fields of the root object, so the call becomes the field itself.
+            if (m.Groups[1].Value.Equals("First", StringComparison.OrdinalIgnoreCase) || m.Groups[1].Value.Equals("Last", StringComparison.OrdinalIgnoreCase))
+            {
+                var fOpen = m.Index + m.Length - 1;
+                var fClose = MatchingParen(s, fOpen);
+                if (fClose < 0) { problem = "unbalanced parentheses"; return null; }
+                var fArgs = SplitArguments(s[(fOpen + 1)..fClose]);
+                if (fArgs.Count is < 1 or > 2) { problem = $"{m.Groups[1].Value} needs one or two arguments"; return null; }
+                var fInner = Scalar(fArgs[0], scopeGroup, out problem);
+                if (fInner is null) return null;
+                FirstUsed = true;
+                s = s[..m.Index] + "(" + fInner + ")" + s[(fClose + 1)..];
+                continue;
+            }
 
             var function = m.Groups[1].Value.ToLowerInvariant() switch
             {
@@ -124,6 +143,19 @@ internal sealed class RdlcExpression(List<AggregateDefinition> aggregates, HashS
             }
 
             s = s[..m.Index] + aggName + s[(close + 1)..];
+        }
+
+        // IIf(condition, a, b) -> (condition ? a : b). Outer calls are rewritten first, so nesting resolves on the next pass.
+        while (true)
+        {
+            var iif = Regex.Match(s, @"\bIIf\s*\(", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+            if (!iif.Success) break;
+            var iOpen = iif.Index + iif.Length - 1;
+            var iClose = MatchingParen(s, iOpen);
+            if (iClose < 0) { problem = "unbalanced parentheses"; return null; }
+            var iArgs = SplitArguments(s[(iOpen + 1)..iClose]);
+            if (iArgs.Count != 3) { problem = "IIf needs three arguments"; return null; }
+            s = s[..iif.Index] + "((" + iArgs[0].Trim() + ") ? (" + iArgs[1].Trim() + ") : (" + iArgs[2].Trim() + "))" + s[(iClose + 1)..];
         }
 
         s = Regex.Replace(s, @"\bFields!(\w+)\.Value\b", "$1", RegexOptions.CultureInvariant);

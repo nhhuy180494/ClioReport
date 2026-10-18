@@ -211,6 +211,10 @@ input[type=text], input[type=number], select, textarea { border-radius: 6px; pad
 
 .num input[type=number] { padding-left: 25px; }
 .band.sel .body { background-color: color-mix(in srgb, var(--bc) 8%, transparent); }
+/* v5: rdlc import */
+#rdlcDlg { width: min(640px, 92vw); padding: 18px 20px; border: 1px solid var(--line2); border-radius: 14px; background: var(--panel); color: var(--text); }
+#rdlcDlg::backdrop { background: rgba(10,14,24,.55); }
+#rdlcWarn { margin: 0 0 14px; padding-left: 18px; max-height: 50vh; overflow: auto; font-size: 12.5px; line-height: 1.5; }
 /* v4: preview */
 #pvDlg { width: min(1100px, 94vw); height: 90vh; padding: 0; border: 1px solid var(--line2); border-radius: 14px; background: var(--panel); color: var(--text); }
 #pvDlg[open] { display: flex; flex-direction: column; }
@@ -247,6 +251,8 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     <div class="grp">
       <button id="bNew" title="New report"></button>
       <button id="bOpen" title="Open JSON"></button>
+      <button id="bRdlc" title="Import an .rdlc / .rdl report (needs the local host)"></button>
+      <input type="file" id="rdlcInput" accept=".rdlc,.rdl,.xml" hidden>
       <button id="bSaveAs" title="Save as" class="icon"></button>
     </div>
     <div class="grp">
@@ -293,6 +299,12 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
   <iframe id="pvFrame" title="PDF preview" hidden></iframe>
   <pre id="pvMsg"></pre>
   <input type="file" id="pvFile" accept=".json,application/json" hidden>
+</dialog>
+<dialog id="rdlcDlg">
+  <h3 style="margin:0 0 6px">RDLC import</h3>
+  <p class="hint" id="rdlcSum" style="margin:0 0 10px"></p>
+  <ul id="rdlcWarn"></ul>
+  <div class="actions" style="justify-content:flex-end"><button id="rdlcOk" class="primary">OK</button></div>
 </dialog>
 <div id="toast"></div>
 
@@ -463,7 +475,8 @@ function refreshButtons() {
   $('bUndo').disabled = !undoStack.length; $('bRedo').disabled = !redoStack.length;
   const d = $('dirty'); if (d) d.hidden = lastSnap === savedSnap;
 }
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 1800); }
+let toastTimer = 0;
+function toast(msg, ms = 1800) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), ms); }
 
 const bodyWidth = () => def.page.width - 2 * def.page.margin;
 function bandWidth(b) {
@@ -1233,7 +1246,7 @@ function initChrome() {
   $('bNew').innerHTML = ico('new') + 'New'; $('bOpen').innerHTML = ico('open') + 'Open';
   $('bSave').innerHTML = ico('save') + 'Save'; $('bSaveAs').innerHTML = ico('saveas'); $('bSaveAs').title = 'Save as…';
   $('bUndo').innerHTML = ico('undo'); $('bRedo').innerHTML = ico('redo');
-  $('zOut').innerHTML = ico('minus'); $('zIn').innerHTML = ico('plus'); $('bJson').innerHTML = ico('json') + 'JSON'; $('bPreview').innerHTML = ico('eye') + 'Preview';
+  $('zOut').innerHTML = ico('minus'); $('zIn').innerHTML = ico('plus'); $('bJson').innerHTML = ico('json') + 'JSON'; $('bPreview').innerHTML = ico('eye') + 'Preview'; $('bRdlc').innerHTML = ico('layers') + 'Import RDLC';
   showZoom();
 }
 function showZoom() { $('zval').title = 'Click to fit the page width'; $('zval').textContent = Math.round(zoom / 4 * 100) + '%'; }
@@ -1252,7 +1265,14 @@ function renderAll() { renderTools(); renderCanvas(); renderProps(); refreshButt
 function load(text, name, handle) {
   let raw;
   try { raw = JSON.parse(text); } catch (e) { toast('Not valid JSON: ' + e.message); return false; }
-  if (!raw || !Array.isArray(raw.bands)) { toast('This does not look like a ClioReport definition.'); return false; }
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && !Array.isArray(raw.bands)) {
+    // Not a report: most likely a sample-data file. Keep it for Preview instead of silently failing.
+    sampleData = raw; sampleName = name || 'sample data';
+    try { if (text.length < 2e6) { localStorage.setItem('clio.sampleData', text); localStorage.setItem('clio.sampleName', sampleName); } } catch { }
+    toast('"' + sampleName + '" is not a report, so it was loaded as sample data. Open a report, then press Preview.', 6000);
+    return false;
+  }
+  if (!raw || !Array.isArray(raw.bands)) { toast('This does not look like a ClioReport definition.', 4000); return false; }
   def = normalize(raw); sel = { kind: 'report' }; undoStack = []; redoStack = []; lastSnap = JSON.stringify(def);
   fileName = name || ''; fileHandle = handle || null; savedSnap = lastSnap;
   renderAll(); fitZoom(); return true;
@@ -1318,6 +1338,25 @@ async function preview() {
     $('pvMsg').hidden = true; const f = $('pvFrame'); f.hidden = false; f.src = url;
   } catch (e) { pvShow('Cannot reach the preview host (' + e.message + '). Is it still running?', true); }
 }
+$('bRdlc').onclick = () => {
+  if (location.protocol === 'file:') { toast('RDLC import needs the local host: dotnet run --project src/ClioReport.Designer', 6000); return; }
+  $('rdlcInput').click();
+};
+$('rdlcInput').onchange = async ev => {
+  const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+  if (undoStack.length && !confirm('Replace the report you are editing? Unsaved changes will be lost.')) return;
+  try {
+    const res = await fetch('api/import-rdlc', { method: 'POST', body: await f.arrayBuffer() });
+    if (!res.ok) { toast('Cannot import: ' + await res.text(), 6000); return; }
+    const out = await res.json();
+    if (!load(out.report, f.name.replace(/\.(rdlc|rdl|xml)$/i, '') + '.json', null)) return;
+    $('rdlcSum').textContent = f.name + ': imported' + (out.warnings.length ? ', ' + out.warnings.length + ' thing(s) need your attention.' : ' with no warnings.');
+    const ul = $('rdlcWarn'); ul.textContent = '';
+    for (const w of out.warnings) { const li = document.createElement('li'); li.textContent = w; ul.append(li); }
+    $('rdlcDlg').showModal();
+  } catch (e) { toast('Cannot reach the host (' + e.message + ')', 6000); }
+};
+$('rdlcOk').onclick = () => $('rdlcDlg').close();
 $('bPreview').onclick = preview;
 $('pvRefresh').onclick = preview;
 $('pvClose').onclick = () => $('pvDlg').close();

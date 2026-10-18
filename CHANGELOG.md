@@ -6,6 +6,8 @@
 - New element types `table` (columns, fixed rows or a collection, header, zebra rows, wrapping rows) and `list` (repeats an item template per item of a collection, `across`, `gap`). Both expand into plain text elements, so renderers need no change.
 - Fix: an element with width 0 (a vertical line) was rejected by the padding check.
 - `src/ClioReport.Designer`: web designer for report JSON (canvas, outline, ruler, properties, undo/redo, drag elements from the toolbar, multi-select with align/distribute/shared style).
+- Designer *Import RDLC* button (`POST /api/import-rdlc` on the designer host).
+- Fixed RDLC import ignoring `<Page>` (size, margins, page header/footer) when it sits inside `<ReportSection>`, which is where Visual Studio writes it.
 - Designer PDF preview: `dotnet run --project src/ClioReport.Designer` serves the designer and renders `POST /api/preview` with ClioReport.Pdf; sample data is a JSON file (see `samples/GoodsReceipt/goods-receipt.data.json`).
 - New package `ClioReport.Rdlc`: `RdlcImporter` converts an `.rdlc`/`.rdl` report (Tablix, row groups, page header/footer, text boxes, lines) into a `ReportDefinition` and lists what it skipped.
 

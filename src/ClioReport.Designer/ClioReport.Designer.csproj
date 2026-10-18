@@ -6,5 +6,6 @@
   <ItemGroup>
     <ProjectReference Include="..\ClioReport.Core\ClioReport.Core.csproj" />
     <ProjectReference Include="..\ClioReport.Pdf\ClioReport.Pdf.csproj" />
+    <ProjectReference Include="..\ClioReport.Rdlc\ClioReport.Rdlc.csproj" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,8 @@
 using System.Text.Json;
 using ClioReport;
+using System.Xml;
 using ClioReport.Pdf;
+using ClioReport.Rdlc;
 
 // Local-only host for the web designer: serves wwwroot and renders a PDF preview of the report being edited.
 //   dotnet run --project src/ClioReport.Designer            -> http://localhost:5178
@@ -42,6 +44,22 @@ app.MapPost("/api/preview", async (HttpRequest request) =>
         return Results.File(ms.ToArray(), "application/pdf");
     }
     catch (Exception ex) when (ex is ReportException or JsonException)
+    {
+        return Results.Text(ex.Message, statusCode: 400);
+    }
+});
+
+// Body: the raw .rdlc/.rdl XML. Returns { report: "<report JSON>", warnings: [...] }, or 400 + text.
+app.MapPost("/api/import-rdlc", async (HttpRequest request) =>
+{
+    try
+    {
+        using var ms = new MemoryStream(); // Kestrel forbids synchronous reads of the request body
+        await request.Body.CopyToAsync(ms); ms.Position = 0;
+        var result = RdlcImporter.Import(ms);
+        return Results.Json(new { report = ReportSerializer.Serialize(result.Definition), warnings = result.Warnings });
+    }
+    catch (Exception ex) when (ex is ReportException or XmlException)
     {
         return Results.Text(ex.Message, statusCode: 400);
     }

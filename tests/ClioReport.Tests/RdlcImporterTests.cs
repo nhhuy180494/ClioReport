@@ -1,3 +1,4 @@
+using ClioReport.Model;
 using ClioReport.Rdlc;
 using Xunit;
 
@@ -165,11 +166,11 @@ public class RdlcImporterTests
     [Fact]
     public void Unsupported_Things_AreReported_NotGuessed()
     {
-        var xml = Sample().Replace("=Fields!code.Value", "=IIf(Fields!qty.Value &gt; 0, &quot;a&quot;, &quot;b&quot;)");
+        var xml = Sample().Replace("=Fields!code.Value", "=Switch(Fields!qty.Value &gt; 0, &quot;a&quot;)");
         var result = RdlcImporter.ImportXml(xml);
 
         var warning = Assert.Single(result.Warnings);
-        Assert.Contains("IIf", warning);
+        Assert.Contains("Switch", warning);
         var detail = result.Definition.Bands.Single(b => b.Type == Model.BandType.Detail);
         Assert.Null(detail.Elements[0].Expression);
     }
@@ -178,5 +179,95 @@ public class RdlcImporterTests
     public void NotAReport_Throws()
     {
         Assert.Throws<ReportException>(() => RdlcImporter.ImportXml("<html/>"));
+    }
+
+    [Fact]
+    public void Page_inside_ReportSection_is_read()
+    {
+        var xml = $"""
+            <Report xmlns="{Ns}"><ReportSections><ReportSection>
+              <Body><ReportItems/><Height>2cm</Height></Body><Width>19cm</Width>
+              <Page><PageHeight>29.7cm</PageHeight><PageWidth>21cm</PageWidth><LeftMargin>1cm</LeftMargin><RightMargin>1cm</RightMargin>
+                <TopMargin>1cm</TopMargin><BottomMargin>1cm</BottomMargin></Page>
+            </ReportSection></ReportSections></Report>
+            """;
+        var def = RdlcImporter.ImportXml(xml).Definition;
+        Assert.Equal(210, def.Page.Width, 1);
+        Assert.Equal(297, def.Page.Height, 1);
+        Assert.Equal(10, def.Page.Margin, 1);
+    }
+
+    private static string Report(string items) => $"""
+        <Report xmlns="{Ns}"><ReportSections><ReportSection>
+          <Body><ReportItems>{items}</ReportItems><Height>10cm</Height></Body><Width>19cm</Width>
+        </ReportSection></ReportSections></Report>
+        """;
+
+    private static string Box(string name, string paragraphs, string geometry = "<Top>0cm</Top><Left>0cm</Left><Height>2cm</Height><Width>10cm</Width>") =>
+        $"<Textbox Name=\"{name}\">{geometry}<Paragraphs>{paragraphs}</Paragraphs></Textbox>";
+
+    private static string Para(string text, string runStyle = "") =>
+        $"<Paragraph><TextRuns><TextRun><Value>{text}</Value><Style>{runStyle}</Style></TextRun></TextRuns></Paragraph>";
+
+    [Fact]
+    public void IIf_and_First_are_translated()
+    {
+        var xml = Report(Box("T", Para("=IIf(Fields!a.Value = &quot;P&quot;, &quot;Pass&quot;, &quot;Fail&quot;) &amp; First(Fields!b.Value, &quot;DS&quot;)")));
+        var result = RdlcImporter.ImportXml(xml);
+        var e = result.Definition.Bands[0].Elements[0];
+        Assert.Contains("?", e.Expression);
+        Assert.Contains("b", e.Expression);
+        Assert.True(!result.Warnings.Any(w => w.Contains("skipped")));
+        Assert.True(result.Warnings.Any(w => w.Contains("First")));
+    }
+
+    [Fact]
+    public void Paragraphs_are_separated_by_line_breaks()
+    {
+        var xml = Report(Box("T", Para("one") + Para("two")));
+        var e = RdlcImporter.ImportXml(xml).Definition.Bands[0].Elements[0];
+        Assert.Equal("one\ntwo", e.Text);
+    }
+
+    [Fact]
+    public void Paragraphs_with_different_styles_become_separate_elements()
+    {
+        var xml = Report(Box("T", Para("Title") + Para("Sub", "<FontSize>9pt</FontSize><Color>Red</Color>")));
+        var elements = RdlcImporter.ImportXml(xml).Definition.Bands[0].Elements;
+        Assert.Equal(2, elements.Count);
+        Assert.Equal("Title", elements[0].Text);
+        Assert.Equal("Sub", elements[1].Text);
+        Assert.Equal(9, elements[1].FontSize);
+        Assert.NotNull(elements[1].Color);
+        Assert.True(elements[1].Y > elements[0].Y);
+    }
+
+    [Fact]
+    public void Column_hierarchy_headers_become_the_column_header_band()
+    {
+        string Header(string name, string text, double cm, string kids = "") =>
+            $"<TablixMember><TablixHeader><Size>{cm}cm</Size><CellContents>{Box(name, Para(text), "")}</CellContents></TablixHeader>{kids}</TablixMember>";
+        var cells = Cell("=Fields!a.Value", "", "c1") + Cell("=Fields!b.Value", "", "c2") + Cell("=Fields!c.Value", "", "c3");
+        var xml = Report($"""
+            <Tablix Name="T"><Top>0cm</Top><Left>0cm</Left><Height>3cm</Height><Width>9cm</Width><DataSetName>ds</DataSetName>
+              <TablixBody>
+                <TablixColumns><TablixColumn><Width>3cm</Width></TablixColumn><TablixColumn><Width>3cm</Width></TablixColumn><TablixColumn><Width>3cm</Width></TablixColumn></TablixColumns>
+                <TablixRows><TablixRow><Height>1cm</Height><TablixCells>{cells}</TablixCells></TablixRow></TablixRows>
+              </TablixBody>
+              <TablixColumnHierarchy><TablixMembers>
+                {Header("h1", "No.", 2)}
+                {Header("h2", "Group", 1, "<TablixMembers>" + Header("h3", "X", 1) + Header("h4", "Y", 1) + "</TablixMembers>")}
+              </TablixMembers></TablixColumnHierarchy>
+              <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="Details"/></TablixMember></TablixMembers></TablixRowHierarchy>
+            </Tablix>
+            """);
+        var band = RdlcImporter.ImportXml(xml).Definition.Bands.Single(b => b.Type == BandType.ColumnHeader);
+        Assert.Equal(20, band.Height, 2);
+        var no = band.Elements.Single(e => e.Text == "No.");
+        Assert.Equal((0, 30, 20), (Math.Round(no.X), Math.Round(no.Width), Math.Round(no.Height)));
+        var group = band.Elements.Single(e => e.Text == "Group");
+        Assert.Equal((30, 60, 10), (Math.Round(group.X), Math.Round(group.Width), Math.Round(group.Height)));
+        var y = band.Elements.Single(e => e.Text == "Y");
+        Assert.Equal((60, 10, 30, 10), (Math.Round(y.X), Math.Round(y.Y), Math.Round(y.Width), Math.Round(y.Height)));
     }
 }
