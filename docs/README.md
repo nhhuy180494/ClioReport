@@ -4,6 +4,7 @@
 
 - Units are millimetres. Element `x`/`y` are relative to their band; `RenderedElement` positions are absolute on the page.
 - Detail rows come from `IDataContext.GetRows(definition.DataSource)` and must be **pre-sorted** by the group expressions (outer group first). The engine does not sort.
+- `ObjectDataContext` reads public properties, dictionary keys and `DataRow` columns (case-insensitive, dotted paths allowed, DBNull = null); it never calls methods. Row collections come from its `sources` or from a collection property of the root object.
 - Field lookup order in expressions: variables (aggregates, `PageNumber`, `PageCount`) -> current row -> root context. Names are case-sensitive.
 - Aggregates: `Count` counts non-null values, the rest need numbers, nulls are skipped. `group` = reset when that group starts; omitted = whole report.
 - Page header/footer bands are evaluated after layout: they can use `PageNumber`, `PageCount`, root fields and report-wide aggregates, but not row fields.

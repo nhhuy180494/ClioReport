@@ -48,6 +48,14 @@ public interface IDataContext
 }
 ```
 
+You rarely need to implement it: `ObjectDataContext` wraps plain objects, dictionaries and `DataTable`/`DataView`:
+
+```csharp
+var data = new ObjectDataContext(
+    new { Title = "PHIEU XUAT KHO" },                          // root fields (properties, case-insensitive)
+    new Dictionary<string, object> { ["items"] = items });      // rows: List<T>, DataTable, dictionaries, ...
+```
+
 Rows must already be sorted by the group expressions. See `samples/PhieuXuatKho` for a complete example and `docs/README.md` for the conventions (units, field lookup, aggregates, pagination).
 
 ### Fonts
