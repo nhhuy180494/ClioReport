@@ -11,6 +11,7 @@ internal sealed class ReportRunner
 
     private readonly ReportDefinition _def;
     private readonly IDataContext _root;
+    private readonly ITextMeasurer? _measurer;
     private readonly Dictionary<string, Expression> _expressions = new();
     private readonly Dictionary<string, object?> _vars = new(StringComparer.Ordinal);
     private readonly List<AggregateState> _aggregates = new();
@@ -27,10 +28,11 @@ internal sealed class ReportRunner
     private object?[]? _lastKeys;
     private IDataContext? _lastCtx;
 
-    public ReportRunner(ReportDefinition definition, IDataContext root)
+    public ReportRunner(ReportDefinition definition, IDataContext root, ITextMeasurer? measurer)
     {
         _def = definition;
         _root = root;
+        _measurer = measurer;
     }
 
     public RenderedReport Execute()
@@ -117,6 +119,8 @@ internal sealed class ReportRunner
             {
                 if (KindOf(e.Type) is null)
                     throw new ReportException($"Unsupported element type '{e.Type}'.");
+                if (e.Wrap && _measurer is null)
+                    throw new ReportException("An element uses 'wrap' but no ITextMeasurer was passed to ReportEngine.Render.");
             }
         }
 
@@ -283,26 +287,65 @@ internal sealed class ReportRunner
     {
         foreach (var band in bands)
         {
-            if (_cursor + band.Height > _bodyBottom + Epsilon)
+            var items = Prepare(band, ctx, out var height);
+
+            var bodyHeight = _bodyBottom - _bodyTop;
+            if (height > bodyHeight + Epsilon)
+                throw new ReportException(
+                    $"{band.Type} band grew to {height:0.##} mm and does not fit in the page body ({bodyHeight:0.##} mm).");
+
+            if (_cursor + height > _bodyBottom + Epsilon)
                 NewPage();
 
-            AddElements(_pages[^1], band, ctx, _cursor);
-            _cursor += band.Height;
+            AddPrepared(_pages[^1], items, _cursor);
+            _cursor += height;
         }
     }
 
-    private void AddElements(RenderedPage page, BandDefinition band, IDataContext ctx, double top)
+    private sealed record PreparedElement(
+        ElementDefinition Def, ElementKind Kind, string Text, double Height, double LineHeight);
+
+    /// <summary>Evaluates a band's elements. Wrapped text can make the band taller than its defined height.</summary>
+    private List<PreparedElement> Prepare(BandDefinition band, IDataContext ctx, out double height)
     {
+        height = band.Height;
+        var items = new List<PreparedElement>(band.Elements.Count);
         foreach (var e in band.Elements)
         {
             var kind = KindOf(e.Type)!.Value;
             var text = kind != ElementKind.Text ? ""
                 : !string.IsNullOrWhiteSpace(e.Expression) ? Values.Str(Eval(e.Expression, ctx))
                 : e.Text ?? "";
+
+            var elementHeight = e.Height;
+            var lineHeight = 0.0;
+            if (kind == ElementKind.Text && e.Wrap && _measurer is not null)
+            {
+                var lines = TextWrapper.Wrap(text, e.Width, _measurer);
+                text = string.Join("\n", lines);
+                lineHeight = _measurer.LineHeight;
+                elementHeight = Math.Max(e.Height, lines.Count * lineHeight);
+                height = Math.Max(height, e.Y + elementHeight);
+            }
+            items.Add(new PreparedElement(e, kind, text, elementHeight, lineHeight));
+        }
+        return items;
+    }
+
+    private void AddPrepared(RenderedPage page, List<PreparedElement> items, double top)
+    {
+        foreach (var item in items)
+        {
+            var e = item.Def;
             page.Add(new RenderedElement(
-                _def.Page.Margin + e.X, top + e.Y, e.Width, e.Height, text, e.Align, kind, e.Thickness));
+                _def.Page.Margin + e.X, top + e.Y, e.Width, item.Height, item.Text, e.Align, item.Kind,
+                e.Thickness, item.LineHeight));
         }
     }
+
+    /// <summary>Used for page header/footer bands, whose height is fixed (wrapped text does not grow them).</summary>
+    private void AddElements(RenderedPage page, BandDefinition band, IDataContext ctx, double top) =>
+        AddPrepared(page, Prepare(band, ctx, out _), top);
 
     /// <summary>
     /// Page header/footer bands are evaluated last, once PageCount is known. They can use PageNumber, PageCount,

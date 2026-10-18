@@ -48,6 +48,9 @@ public sealed class ElementDefinition
     /// <summary>Horizontal alignment inside the element box.</summary>
     public TextAlign Align { get; set; } = TextAlign.Left;
 
+    /// <summary>Wrap text to the element width. The band grows to fit; requires an ITextMeasurer.</summary>
+    public bool Wrap { get; set; }
+
     /// <summary>Static text.</summary>
     public string? Text { get; set; }
 

@@ -32,7 +32,9 @@ internal sealed class SampleContext : IDataContext
                 {
                     ["kho"] = kho,
                     ["code"] = $"{kho[^1]}-{i:000}",
-                    ["name"] = $"Vật tư số {i}",
+                    ["name"] = i % 4 == 0
+                        ? $"Vật tư số {i} - loại đặc biệt dùng cho dây chuyền lắp ráp số 3, hàng dễ vỡ cần đóng gói riêng"
+                        : $"Vật tư số {i}",
                     ["qty"] = i * 1250,
                     ["unit"] = "Cái"
                 }));

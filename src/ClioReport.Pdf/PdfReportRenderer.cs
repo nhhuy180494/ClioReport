@@ -5,10 +5,10 @@ using PdfSharp.Pdf;
 
 namespace ClioReport.Pdf;
 
-/// <summary>Draws a <see cref="RenderedReport"/> to PDF. Text only, one font, no wrapping or clipping yet.</summary>
+/// <summary>Draws a <see cref="RenderedReport"/> to PDF. One font, no clipping.</summary>
 public static class PdfReportRenderer
 {
-    private const double PointsPerMm = 72.0 / 25.4;
+    internal const double PointsPerMm = 72.0 / 25.4;
     private static readonly object FontLock = new();
 
     public static void Render(RenderedReport report, string path, PdfRenderOptions? options = null)
@@ -46,9 +46,25 @@ public static class PdfReportRenderer
                         gfx.DrawRectangle(PenOf(e), rect);
                         break;
                     default:
-                        if (e.Text.Length > 0)
+                    {
+                        if (e.Text.Length == 0) break;
+
+                        if (e.LineHeight <= 0)
+                        {
                             gfx.DrawString(e.Text, font, XBrushes.Black, rect, FormatOf(e.Align));
+                            break;
+                        }
+
+                        var step = e.LineHeight * PointsPerMm;
+                        var lines = e.Text.Split('\n');
+                        for (var i = 0; i < lines.Length; i++)
+                        {
+                            if (lines[i].Length == 0) continue;
+                            var lineRect = new XRect(rect.X, rect.Y + i * step, rect.Width, step);
+                            gfx.DrawString(lines[i], font, XBrushes.Black, lineRect, FormatOf(e.Align));
+                        }
                         break;
+                    }
                 }
             }
         }
@@ -65,7 +81,7 @@ public static class PdfReportRenderer
         _ => XStringFormats.TopLeft
     };
 
-    private static void EnsureFontResolver(PdfRenderOptions options)
+    internal static void EnsureFontResolver(PdfRenderOptions options)
     {
         lock (FontLock)
         {

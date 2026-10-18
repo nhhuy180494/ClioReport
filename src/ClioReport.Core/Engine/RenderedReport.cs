@@ -19,7 +19,10 @@ public sealed class RenderedPage
     internal void Add(RenderedElement element) => _elements.Add(element);
 }
 
-/// <summary>Absolute position on the page, in millimetres from the top-left corner.</summary>
+/// <summary>
+/// Absolute position on the page, in millimetres from the top-left corner. When <c>LineHeight</c> is above zero the
+/// text was wrapped: lines are separated by '\n' and each line is <c>LineHeight</c> tall.
+/// </summary>
 public enum ElementKind
 {
     Text,
@@ -31,4 +34,5 @@ public enum ElementKind
 
 public sealed record RenderedElement(
     double X, double Y, double Width, double Height, string Text,
-    TextAlign Align = TextAlign.Left, ElementKind Kind = ElementKind.Text, double Thickness = 0.2);
+    TextAlign Align = TextAlign.Left, ElementKind Kind = ElementKind.Text, double Thickness = 0.2,
+    double LineHeight = 0);

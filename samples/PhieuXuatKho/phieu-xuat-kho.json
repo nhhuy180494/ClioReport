@@ -24,7 +24,7 @@
     ] },
     { "type": "detail", "height": 6, "elements": [
       { "x": 0, "y": 0, "width": 40, "height": 5, "expression": "code" },
-      { "x": 40, "y": 0, "width": 90, "height": 5, "expression": "name" },
+      { "x": 40, "y": 0, "width": 90, "height": 5, "wrap": true, "expression": "name" },
       { "x": 130, "y": 0, "width": 25, "height": 5, "align": "right", "expression": "Format(qty, 'N0')" },
       { "x": 160, "y": 0, "width": 30, "height": 5, "expression": "unit" }
     ] },

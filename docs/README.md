@@ -10,4 +10,5 @@
 - Bands are never split across pages. A group header (all its header bands) is kept with the first row's detail bands: if they do not fit in the space left, both move to the next page. Set `pageBreakBefore: true` on a group to start each of its instances on a new page (the first one never leaves an empty page).
 - Element `align`: `left` (default), `center`, `right`, inside the element box (`x`..`x+width`).
 - Element `type`: `text` (default), `line` (from `x,y` to `x+width,y+height`; use `height: 0` for a horizontal rule) or `rect` (outline). `thickness` is in mm (default 0.2).
+- `wrap: true` on a text element wraps it to the element `width` (word wrap, long words break by character, `\n` is a paragraph break) and grows the band to fit. It needs an `ITextMeasurer`: pass `new PdfTextMeasurer(options)` (same `PdfRenderOptions` as the renderer) to `ReportEngine.Render`. Page header/footer bands never grow, and the keep-together check uses defined band heights, not grown ones.
 - Numbers print with invariant culture; use `Format(x, 'N0')` for thousands separators.
