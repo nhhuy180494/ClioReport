@@ -3,6 +3,8 @@
 ## Unreleased
 
 - `page.columns` and `page.columnGap`: multi-column detail layout for labels.
+- Elements: `vAlign` and `fitBand` for table cells.
+- `ClioReport.Pdf`: font fallback (`FallbackFontFilePath`) for text that mixes scripts, e.g. Vietnamese and Korean.
 
 ## 0.1.0-alpha.2
 

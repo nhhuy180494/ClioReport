@@ -25,8 +25,13 @@ public sealed class PdfTextMeasurer : ITextMeasurer, IDisposable
 
     public double MeasureWidth(string text) => MeasureWidth(text, default);
 
-    public double MeasureWidth(string text, TextStyle style) =>
-        _gfx.MeasureString(text, _fonts.Get(style)).Width / PdfReportRenderer.PointsPerMm;
+    public double MeasureWidth(string text, TextStyle style)
+    {
+        var width = 0.0;
+        foreach (var (part, font) in _fonts.Runs(text, style))
+            width += _gfx.MeasureString(part, font).Width;
+        return width / PdfReportRenderer.PointsPerMm;
+    }
 
     public double GetLineHeight(TextStyle style) =>
         _fonts.Get(style).GetHeight() / PdfReportRenderer.PointsPerMm;

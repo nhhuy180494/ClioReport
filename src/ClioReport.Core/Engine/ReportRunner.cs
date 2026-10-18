@@ -470,6 +470,13 @@ internal sealed class ReportRunner
             }
             items.Add(new PreparedElement(e, kind, text, elementHeight, lineHeight, image));
         }
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            if (item.Def.FitBand && item.Kind != ElementKind.Line)
+                items[i] = item with { Height = Math.Max(item.Height, height - item.Def.Y) };
+        }
         return items;
     }
 
@@ -507,7 +514,7 @@ internal sealed class ReportRunner
             page.Add(new RenderedElement(
                 _def.Page.Margin + left + e.X, top + e.Y, e.Width, item.Height, item.Text, e.Align, item.Kind,
                 e.Thickness, item.LineHeight, item.Image, new TextStyle(e.Bold, e.Italic, e.FontSize),
-                e.Color, e.Fill, e.Border, e.Padding));
+                e.Color, e.Fill, e.Border, e.Padding, e.VAlign));
         }
     }
 

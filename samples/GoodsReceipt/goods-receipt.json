@@ -1,0 +1,694 @@
+{
+  "version": 1,
+  "name": "GoodsReceipt",
+  "dataSource": "items",
+  "page": {
+    "width": 210,
+    "height": 297,
+    "margin": 5
+  },
+  "bands": [
+    {
+      "type": "reportHeader",
+      "height": 102,
+      "elements": [
+        {
+          "x": 0,
+          "y": 2,
+          "width": 40,
+          "height": 9,
+          "text": "KUGIL",
+          "bold": true,
+          "fontSize": 22,
+          "color": "#0B2A4A"
+        },
+        {
+          "x": 30.5,
+          "y": 10,
+          "width": 80,
+          "height": 5,
+          "text": "Kugil Glass Co., Ltd.",
+          "fontSize": 8
+        },
+        {
+          "x": 0,
+          "y": 19,
+          "width": 195,
+          "height": 9,
+          "align": "center",
+          "bold": true,
+          "fontSize": 20,
+          "color": "#12589B",
+          "text": "PHIẾU NHẬP KHO"
+        },
+        {
+          "x": 0,
+          "y": 28,
+          "width": 195,
+          "height": 7,
+          "align": "center",
+          "italic": true,
+          "fontSize": 15,
+          "color": "#12589B",
+          "text": "Goods Receipt"
+        },
+        {
+          "type": "line",
+          "x": 0,
+          "y": 37,
+          "width": 195,
+          "height": 0,
+          "thickness": 0.3
+        },
+        {
+          "x": 0,
+          "y": 40,
+          "width": 60,
+          "height": 5,
+          "bold": true,
+          "fontSize": 9,
+          "expression": "docNo"
+        },
+        {
+          "x": 0,
+          "y": 46,
+          "width": 60,
+          "height": 5,
+          "bold": true,
+          "fontSize": 9,
+          "expression": "docNo2"
+        },
+        {
+          "x": 0,
+          "y": 52.5,
+          "width": 14,
+          "height": 4,
+          "text": "Date:"
+        },
+        {
+          "x": 14,
+          "y": 52.5,
+          "width": 40,
+          "height": 4,
+          "expression": "date"
+        },
+        {
+          "x": 0,
+          "y": 57.5,
+          "width": 14,
+          "height": 4,
+          "text": "Dept:"
+        },
+        {
+          "x": 14,
+          "y": 57.5,
+          "width": 40,
+          "height": 4,
+          "expression": "dept"
+        },
+        {
+          "x": 0,
+          "y": 62,
+          "width": 14,
+          "height": 4,
+          "text": "Fullname:"
+        },
+        {
+          "x": 14,
+          "y": 62,
+          "width": 60,
+          "height": 4,
+          "expression": "fullname"
+        },
+        {
+          "x": 86,
+          "y": 39,
+          "width": 26.5,
+          "height": 20.75,
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "text": "Approval"
+        },
+        {
+          "x": 112.5,
+          "y": 39,
+          "width": 26.5,
+          "height": 6.75,
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 9,
+          "text": "Requester"
+        },
+        {
+          "x": 112.5,
+          "y": 45.75,
+          "width": 26.5,
+          "height": 14,
+          "border": true
+        },
+        {
+          "x": 112.5,
+          "y": 59.75,
+          "width": 26.5,
+          "height": 7,
+          "border": true
+        },
+        {
+          "x": 139,
+          "y": 39,
+          "width": 29,
+          "height": 6.75,
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 9,
+          "text": "Accountant"
+        },
+        {
+          "x": 139,
+          "y": 45.75,
+          "width": 29,
+          "height": 14,
+          "border": true
+        },
+        {
+          "x": 139,
+          "y": 59.75,
+          "width": 29,
+          "height": 7,
+          "border": true
+        },
+        {
+          "x": 168,
+          "y": 39,
+          "width": 27,
+          "height": 6.75,
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 9,
+          "text": "Director"
+        },
+        {
+          "x": 168,
+          "y": 45.75,
+          "width": 27,
+          "height": 14,
+          "border": true
+        },
+        {
+          "x": 168,
+          "y": 59.75,
+          "width": 27,
+          "height": 7,
+          "border": true
+        },
+        {
+          "x": 86,
+          "y": 59.75,
+          "width": 26.5,
+          "height": 7,
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 9,
+          "text": "Name"
+        },
+        {
+          "x": 0,
+          "y": 67.5,
+          "width": 195,
+          "height": 20,
+          "border": true
+        },
+        {
+          "x": 1.5,
+          "y": 70,
+          "width": 16,
+          "height": 4,
+          "text": "Vendor:"
+        },
+        {
+          "x": 17.5,
+          "y": 70,
+          "width": 170,
+          "height": 4,
+          "bold": true,
+          "expression": "vendor"
+        },
+        {
+          "x": 1.5,
+          "y": 74.75,
+          "width": 16,
+          "height": 4,
+          "text": "Address:"
+        },
+        {
+          "x": 17.5,
+          "y": 74.75,
+          "width": 170,
+          "height": 4,
+          "bold": true,
+          "expression": "address"
+        },
+        {
+          "x": 1.5,
+          "y": 79.5,
+          "width": 16,
+          "height": 4,
+          "text": "Tax code:"
+        },
+        {
+          "x": 17.5,
+          "y": 79.5,
+          "width": 170,
+          "height": 4,
+          "bold": true,
+          "expression": "taxCode"
+        },
+        {
+          "x": 1.5,
+          "y": 84,
+          "width": 16,
+          "height": 4,
+          "text": "Tel:"
+        },
+        {
+          "x": 17.5,
+          "y": 84,
+          "width": 170,
+          "height": 4,
+          "bold": true,
+          "expression": "tel"
+        },
+        {
+          "x": 148,
+          "y": 91.25,
+          "width": 24.5,
+          "height": 5,
+          "border": true,
+          "bold": true,
+          "align": "right",
+          "vAlign": "middle",
+          "padding": 1.5,
+          "text": "NO."
+        },
+        {
+          "x": 172.5,
+          "y": 91.25,
+          "width": 22.5,
+          "height": 5,
+          "border": true,
+          "vAlign": "middle",
+          "padding": 1.5,
+          "expression": "no"
+        },
+        {
+          "x": 130,
+          "y": 97.5,
+          "width": 65,
+          "height": 4,
+          "align": "right",
+          "italic": true,
+          "expression": "'Currency: ' + currency"
+        }
+      ]
+    },
+    {
+      "type": "columnHeader",
+      "height": 6,
+      "elements": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 19.5,
+          "height": 6,
+          "fill": "#FBE5D0",
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Item Code"
+        },
+        {
+          "x": 19.5,
+          "y": 0,
+          "width": 40,
+          "height": 6,
+          "fill": "#FBE5D0",
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Item Name"
+        },
+        {
+          "x": 59.5,
+          "y": 0,
+          "width": 27,
+          "height": 6,
+          "fill": "#FBE5D0",
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Barcode (LOT)"
+        },
+        {
+          "x": 86.5,
+          "y": 0,
+          "width": 13.25,
+          "height": 6,
+          "fill": "#FBE5D0",
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Unit"
+        },
+        {
+          "x": 99.75,
+          "y": 0,
+          "width": 27.75,
+          "height": 6,
+          "fill": "#FBE5D0",
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Description"
+        },
+        {
+          "x": 127.5,
+          "y": 0,
+          "width": 15.25,
+          "height": 6,
+          "fill": "#FBE5D0",
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Quantity"
+        },
+        {
+          "x": 142.75,
+          "y": 0,
+          "width": 18.25,
+          "height": 6,
+          "fill": "#FBE5D0",
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Price/Unit"
+        },
+        {
+          "x": 161,
+          "y": 0,
+          "width": 17.25,
+          "height": 6,
+          "fill": "#FBE5D0",
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Amount"
+        },
+        {
+          "x": 178.25,
+          "y": 0,
+          "width": 16.75,
+          "height": 6,
+          "fill": "#FBE5D0",
+          "border": true,
+          "bold": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Remark"
+        }
+      ]
+    },
+    {
+      "type": "detail",
+      "height": 14,
+      "elements": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 19.5,
+          "height": 14,
+          "border": true,
+          "vAlign": "middle",
+          "align": "center",
+          "fitBand": true,
+          "padding": 1,
+          "fontSize": 7.5,
+          "expression": "code"
+        },
+        {
+          "x": 19.5,
+          "y": 0,
+          "width": 40,
+          "height": 14,
+          "border": true,
+          "vAlign": "middle",
+          "align": "center",
+          "fitBand": true,
+          "padding": 1,
+          "fontSize": 7.5,
+          "expression": "name",
+          "wrap": true
+        },
+        {
+          "x": 59.5,
+          "y": 0,
+          "width": 27,
+          "height": 14,
+          "border": true,
+          "vAlign": "middle",
+          "align": "center",
+          "fitBand": true,
+          "padding": 1,
+          "fontSize": 7.5,
+          "expression": "barcode"
+        },
+        {
+          "x": 86.5,
+          "y": 0,
+          "width": 13.25,
+          "height": 14,
+          "border": true,
+          "vAlign": "middle",
+          "align": "center",
+          "fitBand": true,
+          "padding": 1,
+          "fontSize": 7.5,
+          "expression": "unit"
+        },
+        {
+          "x": 99.75,
+          "y": 0,
+          "width": 27.75,
+          "height": 14,
+          "border": true,
+          "vAlign": "middle",
+          "align": "center",
+          "fitBand": true,
+          "padding": 1,
+          "fontSize": 7.5
+        },
+        {
+          "type": "image",
+          "x": 101.5,
+          "y": 1.75,
+          "width": 24.25,
+          "height": 10.5,
+          "align": "center",
+          "expression": "image"
+        },
+        {
+          "x": 127.5,
+          "y": 0,
+          "width": 15.25,
+          "height": 14,
+          "border": true,
+          "vAlign": "middle",
+          "align": "center",
+          "fitBand": true,
+          "padding": 1,
+          "fontSize": 7.5,
+          "expression": "Format(qty, 'N0')"
+        },
+        {
+          "x": 142.75,
+          "y": 0,
+          "width": 18.25,
+          "height": 14,
+          "border": true,
+          "vAlign": "middle",
+          "align": "center",
+          "fitBand": true,
+          "padding": 1,
+          "fontSize": 7.5,
+          "expression": "Format(price, 'N0')"
+        },
+        {
+          "x": 161,
+          "y": 0,
+          "width": 17.25,
+          "height": 14,
+          "border": true,
+          "vAlign": "middle",
+          "align": "center",
+          "fitBand": true,
+          "padding": 1,
+          "fontSize": 7.5,
+          "color": "#0B2A8A",
+          "expression": "Format(amount, 'N0')"
+        },
+        {
+          "x": 178.25,
+          "y": 0,
+          "width": 16.75,
+          "height": 14,
+          "border": true,
+          "vAlign": "middle",
+          "align": "center",
+          "fitBand": true,
+          "padding": 1,
+          "fontSize": 7.5,
+          "expression": "remark"
+        }
+      ]
+    },
+    {
+      "type": "reportFooter",
+      "height": 40,
+      "elements": [
+        {
+          "x": 0,
+          "y": 0.0,
+          "width": 161,
+          "height": 4.5,
+          "fill": "#FBE5D0",
+          "border": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Sub total"
+        },
+        {
+          "x": 161,
+          "y": 0.0,
+          "width": 17.25,
+          "height": 4.5,
+          "border": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "color": "#0B2A8A",
+          "expression": "Format(subtotal, 'N0')"
+        },
+        {
+          "x": 0,
+          "y": 4.5,
+          "width": 161,
+          "height": 4.5,
+          "fill": "#FBE5D0",
+          "border": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Tax"
+        },
+        {
+          "x": 161,
+          "y": 4.5,
+          "width": 17.25,
+          "height": 4.5,
+          "border": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "color": "#0B2A8A",
+          "expression": "Format(tax, 'N0')"
+        },
+        {
+          "x": 0,
+          "y": 9.0,
+          "width": 161,
+          "height": 4.5,
+          "fill": "#FBE5D0",
+          "border": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "text": "Total Payment"
+        },
+        {
+          "x": 161,
+          "y": 9.0,
+          "width": 17.25,
+          "height": 4.5,
+          "border": true,
+          "align": "center",
+          "vAlign": "middle",
+          "fontSize": 7.5,
+          "color": "#0B2A8A",
+          "expression": "Format(total, 'N0')"
+        },
+        {
+          "x": 178.25,
+          "y": 0,
+          "width": 16.75,
+          "height": 13.5,
+          "border": true
+        },
+        {
+          "x": 0,
+          "y": 21.25,
+          "width": 120,
+          "height": 4,
+          "text": "* Other Requests:"
+        },
+        {
+          "x": 0,
+          "y": 25.85,
+          "width": 120,
+          "height": 4,
+          "text": "Purchase Company:"
+        },
+        {
+          "x": 0,
+          "y": 30.45,
+          "width": 120,
+          "height": 4,
+          "text": "Delivery Time:"
+        },
+        {
+          "x": 0,
+          "y": 35.05,
+          "width": 120,
+          "height": 4,
+          "text": "Remark:"
+        }
+      ]
+    }
+  ]
+}

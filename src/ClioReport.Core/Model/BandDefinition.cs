@@ -19,6 +19,13 @@ public enum TextAlign
     Right
 }
 
+public enum VerticalAlign
+{
+    Top,
+    Middle,
+    Bottom
+}
+
 public sealed class BandDefinition
 {
     public BandType Type { get; set; }
@@ -54,6 +61,14 @@ public sealed class ElementDefinition
 
     /// <summary>Horizontal alignment inside the element box.</summary>
     public TextAlign Align { get; set; } = TextAlign.Left;
+
+    /// <summary>Vertical position of the text inside the element box (default top).</summary>
+    public VerticalAlign VAlign { get; set; }
+
+    /// <summary>
+    /// Stretches the element to the bottom of its band, so fill and border match a band that grew because of wrapped text.
+    /// </summary>
+    public bool FitBand { get; set; }
 
     /// <summary>Wrap text to the element width. The band grows to fit; requires an ITextMeasurer.</summary>
     public bool Wrap { get; set; }

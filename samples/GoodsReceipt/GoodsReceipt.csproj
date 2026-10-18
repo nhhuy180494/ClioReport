@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ClioReport.Core\ClioReport.Core.csproj" />
+    <ProjectReference Include="..\..\src\ClioReport.Pdf\ClioReport.Pdf.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="goods-receipt.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

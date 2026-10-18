@@ -66,19 +66,20 @@ public static class PdfReportRenderer
                         rect = new XRect(rect.X + e.Padding * PointsPerMm, rect.Y, rect.Width - 2 * e.Padding * PointsPerMm, rect.Height);
                         var brush = e.Color is null ? XBrushes.Black : BrushOf(e.Color);
 
-                        if (e.LineHeight <= 0)
+                        var lines = e.LineHeight <= 0 ? new[] { e.Text } : e.Text.Split('\n');
+                        var step = e.LineHeight <= 0 ? font.GetHeight() : e.LineHeight * PointsPerMm;
+                        var block = lines.Length * step;
+                        var top = e.VAlign switch
                         {
-                            gfx.DrawString(e.Text, font, brush, rect, FormatOf(e.Align));
-                            break;
-                        }
-
-                        var step = e.LineHeight * PointsPerMm;
-                        var lines = e.Text.Split('\n');
+                            VerticalAlign.Middle => Math.Max(rect.Y, rect.Y + (rect.Height - block) / 2),
+                            VerticalAlign.Bottom => Math.Max(rect.Y, rect.Bottom - block),
+                            _ => rect.Y
+                        };
                         for (var i = 0; i < lines.Length; i++)
                         {
                             if (lines[i].Length == 0) continue;
-                            var lineRect = new XRect(rect.X, rect.Y + i * step, rect.Width, step);
-                            gfx.DrawString(lines[i], font, brush, lineRect, FormatOf(e.Align));
+                            var lineRect = new XRect(rect.X, top + i * step, rect.Width, step);
+                            DrawLine(gfx, fonts, lines[i], e, font, brush, lineRect);
                         }
                         break;
                     }
@@ -87,6 +88,31 @@ public static class PdfReportRenderer
         }
 
         document.Save(output, false);
+    }
+
+    /// <summary>Draws one line; when it mixes main and fallback fonts each run is placed after the previous one.</summary>
+    private static void DrawLine(XGraphics gfx, FontCache fonts, string text, RenderedElement e, XFont font, XBrush brush, XRect rect)
+    {
+        var runs = fonts.Runs(text, e.Style);
+        if (runs.Count <= 1)
+        {
+            gfx.DrawString(text, runs.Count == 1 ? runs[0].Font : font, brush, rect, FormatOf(e.Align));
+            return;
+        }
+
+        var widths = runs.Select(r => gfx.MeasureString(r.Text, r.Font).Width).ToList();
+        var total = widths.Sum();
+        var x = e.Align switch
+        {
+            TextAlign.Center => rect.X + (rect.Width - total) / 2,
+            TextAlign.Right => rect.Right - total,
+            _ => rect.X
+        };
+        for (var i = 0; i < runs.Count; i++)
+        {
+            gfx.DrawString(runs[i].Text, runs[i].Font, brush, new XRect(x, rect.Y, widths[i] + 1, rect.Height), XStringFormats.TopLeft);
+            x += widths[i];
+        }
     }
 
     private static void DrawBarcode(XGraphics gfx, RenderedElement e, XRect rect)
@@ -192,7 +218,8 @@ public static class PdfReportRenderer
 
             GlobalFontSettings.FontResolver = new SingleFileFontResolver(
                 path, ExistingOrNull(options.BoldFontFilePath), ExistingOrNull(options.ItalicFontFilePath),
-                ExistingOrNull(options.BoldItalicFontFilePath));
+                ExistingOrNull(options.BoldItalicFontFilePath), ExistingOrNull(options.FallbackFontFilePath),
+                ExistingOrNull(options.FallbackBoldFontFilePath));
         }
     }
 

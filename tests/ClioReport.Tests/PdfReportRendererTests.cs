@@ -206,4 +206,17 @@ public class PdfReportRendererTests
         Assert.True(styled.Length != plain.Length);
         Assert.True(rect.Length > 100);
     }
+
+    [Fact]
+    public void VerticalAlign_IsRendered()
+    {
+        var fontPath = FontPath();
+        if (fontPath is null) return;
+        var options = new PdfRenderOptions { FontFilePath = fontPath };
+
+        var pdf = RenderPdf(
+            """{ "width": 40, "height": 12, "text": "x", "border": true, "vAlign": "middle", "align": "center" }""", new { }, options);
+
+        Assert.True(pdf.Length > 100);
+    }
 }

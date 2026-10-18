@@ -24,6 +24,15 @@ public sealed class PdfRenderOptions
     public string? BoldItalicFontFilePath { get; set; }
 
     /// <summary>
+    /// Fallback TrueType file for characters <see cref="FontFilePath"/> does not have, e.g. Malgun Gothic (Hangul)
+    /// behind Arial (Vietnamese). Used only when ClioReport registers its own font resolver.
+    /// </summary>
+    public string? FallbackFontFilePath { get; set; }
+
+    /// <summary>Optional bold variant of <see cref="FallbackFontFilePath"/>. When null, bold is simulated.</summary>
+    public string? FallbackBoldFontFilePath { get; set; }
+
+    /// <summary>
     /// Folder that image elements may load files from when their value is a path (resolved against this folder;
     /// paths escaping it are rejected). Null disables path loading: supply images as byte[] instead.
     /// </summary>
