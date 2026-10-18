@@ -7,6 +7,7 @@
 - Fix: an element with width 0 (a vertical line) was rejected by the padding check.
 - `src/ClioReport.Designer`: web designer for report JSON (canvas, outline, ruler, properties, undo/redo, drag elements from the toolbar, multi-select with align/distribute/shared style).
 - Designer *Import RDLC* button (`POST /api/import-rdlc` on the designer host).
+- RDLC import: column-hierarchy header cells (spanning headers) become the `columnHeader` band, `IIf` is translated, `First/Last(...)` become plain fields, paragraphs keep their line breaks and paragraphs with different styles become separate elements.
 - Fixed RDLC import ignoring `<Page>` (size, margins, page header/footer) when it sits inside `<ReportSection>`, which is where Visual Studio writes it.
 - Designer PDF preview: `dotnet run --project src/ClioReport.Designer` serves the designer and renders `POST /api/preview` with ClioReport.Pdf; sample data is a JSON file (see `samples/GoodsReceipt/goods-receipt.data.json`).
 - New package `ClioReport.Rdlc`: `RdlcImporter` converts an `.rdlc`/`.rdl` report (Tablix, row groups, page header/footer, text boxes, lines) into a `ReportDefinition` and lists what it skipped.
