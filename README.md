@@ -78,4 +78,4 @@ dotnet run --project samples/PhieuXuatKho
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). The QR encoder is a port of Project Nayuki's MIT-licensed library, see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
