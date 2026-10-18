@@ -14,6 +14,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClioReport.Rdlc", "src\Clio
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoodsReceipt", "samples\GoodsReceipt\GoodsReceipt.csproj", "{3B1D5A10-6C2E-4F11-9A01-000000000005}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClioReport.Designer", "src\ClioReport.Designer\ClioReport.Designer.csproj", "{3B1D5A10-6C2E-4F11-9A01-000000000007}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,6 +34,10 @@ Global
 		{3B1D5A10-6C2E-4F11-9A01-000000000006}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3B1D5A10-6C2E-4F11-9A01-000000000006}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3B1D5A10-6C2E-4F11-9A01-000000000006}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B1D5A10-6C2E-4F11-9A01-000000000007}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B1D5A10-6C2E-4F11-9A01-000000000007}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B1D5A10-6C2E-4F11-9A01-000000000007}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B1D5A10-6C2E-4F11-9A01-000000000007}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3B1D5A10-6C2E-4F11-9A01-000000000003}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3B1D5A10-6C2E-4F11-9A01-000000000003}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3B1D5A10-6C2E-4F11-9A01-000000000003}.Release|Any CPU.ActiveCfg = Release|Any CPU

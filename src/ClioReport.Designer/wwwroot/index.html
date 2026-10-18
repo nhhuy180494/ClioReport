@@ -211,6 +211,16 @@ input[type=text], input[type=number], select, textarea { border-radius: 6px; pad
 
 .num input[type=number] { padding-left: 25px; }
 .band.sel .body { background-color: color-mix(in srgb, var(--bc) 8%, transparent); }
+/* v4: preview */
+#pvDlg { width: min(1100px, 94vw); height: 90vh; padding: 0; border: 1px solid var(--line2); border-radius: 14px; background: var(--panel); color: var(--text); }
+#pvDlg[open] { display: flex; flex-direction: column; }
+#pvDlg::backdrop { background: rgba(10,14,24,.55); }
+.pvhead { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.pvhead .sp { flex: 1; }
+.pvhead .hint { margin: 0; }
+#pvFrame { flex: 1; width: 100%; border: 0; background: #525659; }
+#pvMsg { flex: 1; margin: 0; padding: 18px 20px; white-space: pre-wrap; font: 13px/1.5 ui-monospace, Consolas, monospace; overflow: auto; }
+#pvMsg.err { color: var(--danger); }
 /* v3: scrollbars + drag-drop + multi-select */
 .marquee { position: absolute; z-index: 6; pointer-events: none; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .el.msel { outline: 2px solid var(--accent); outline-offset: 0; }
@@ -248,6 +258,7 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     <span class="sp"></span>
     <label class="chip" title="Snap to 0.5 mm"><input type="checkbox" id="snap" checked> Snap</label>
     <button id="bJson" class="ghost"></button>
+    <button id="bPreview" class="ghost" title="Preview as PDF (needs the local host)"></button>
     <button id="bSave" class="primary" title="Save (Ctrl+S)"></button>
     <input type="file" id="fileInput" accept=".json,application/json" hidden>
   </div>
@@ -270,6 +281,18 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
   <div class="actions" style="justify-content:flex-end">
     <button id="jsonCopy" class="ghost">Copy</button><button id="jsonApply" class="primary">Apply</button><button id="jsonClose" class="ghost">Close</button>
   </div>
+</dialog>
+<dialog id="pvDlg">
+  <div class="pvhead">
+    <b>PDF preview</b><span id="pvData" class="hint"></span><span class="sp"></span>
+    <button id="pvPick" class="ghost" title="Load a JSON file with sample values and rows">Sample data…</button>
+    <button id="pvClear" class="ghost" hidden>Clear data</button>
+    <button id="pvRefresh" class="ghost">Refresh</button>
+    <button id="pvClose" class="primary">Close</button>
+  </div>
+  <iframe id="pvFrame" title="PDF preview" hidden></iframe>
+  <pre id="pvMsg"></pre>
+  <input type="file" id="pvFile" accept=".json,application/json" hidden>
 </dialog>
 <div id="toast"></div>
 
@@ -392,6 +415,7 @@ const ICONS = {
   open: '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
   save: '<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>', saveas: '<path d="M5 4h11l3 3v6M5 4v16h7"/><path d="M8 4v5h7V4M17 21v-6M14 18h6"/>',
   new: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M12 11v6M9 14h6"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   json: '<path d="M8 4c-2 0-2 2-2 4s-1 3-2 4c1 1 2 2 2 4s0 4 2 4M16 4c2 0 2 2 2 4s1 3 2 4c-1 1-2 2-2 4s0 4-2 4"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
@@ -1209,7 +1233,7 @@ function initChrome() {
   $('bNew').innerHTML = ico('new') + 'New'; $('bOpen').innerHTML = ico('open') + 'Open';
   $('bSave').innerHTML = ico('save') + 'Save'; $('bSaveAs').innerHTML = ico('saveas'); $('bSaveAs').title = 'Save as…';
   $('bUndo').innerHTML = ico('undo'); $('bRedo').innerHTML = ico('redo');
-  $('zOut').innerHTML = ico('minus'); $('zIn').innerHTML = ico('plus'); $('bJson').innerHTML = ico('json') + 'JSON';
+  $('zOut').innerHTML = ico('minus'); $('zIn').innerHTML = ico('plus'); $('bJson').innerHTML = ico('json') + 'JSON'; $('bPreview').innerHTML = ico('eye') + 'Preview';
   showZoom();
 }
 function showZoom() { $('zval').title = 'Click to fit the page width'; $('zval').textContent = Math.round(zoom / 4 * 100) + '%'; }
@@ -1270,6 +1294,45 @@ $('bOpen').onclick = openFile; $('bSave').onclick = save; $('bSaveAs').onclick =
 $('bUndo').onclick = undo; $('bRedo').onclick = redo;
 $('zval').onclick = fitZoom; $('zOut').onclick = () => stepZoom(-1); $('zIn').onclick = () => stepZoom(1);
 $('snap').onchange = ev => { snap = ev.target.checked; };
+// ---------------------------------------------------------------- PDF preview (needs src/ClioReport.Designer host)
+let sampleData = null, sampleName = '', pvUrl = null;
+try { const k = localStorage.getItem('clio.sampleData'); if (k) { sampleData = JSON.parse(k); sampleName = localStorage.getItem('clio.sampleName') || 'sample data'; } } catch { }
+function pvShow(text, isErr) {
+  $('pvFrame').hidden = true; $('pvFrame').removeAttribute('src');
+  const m = $('pvMsg'); m.hidden = false; m.textContent = text; m.className = isErr ? 'err' : '';
+}
+function pvLabel() { $('pvData').textContent = sampleData ? 'Data: ' + sampleName : 'No sample data: fields are blank'; $('pvClear').hidden = !sampleData; }
+async function preview() {
+  const dlg = $('pvDlg'); if (!dlg.open) dlg.showModal();
+  pvLabel();
+  if (location.protocol === 'file:') {
+    pvShow('Preview needs the local host.\n\n  dotnet run --project src/ClioReport.Designer\n\nthen open http://localhost:5178 instead of this file.', true); return;
+  }
+  pvShow('Rendering…', false);
+  try {
+    const res = await fetch('api/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ report: JSON.parse(serialize()), data: sampleData || undefined }) });
+    if (!res.ok) { pvShow(await res.text(), true); return; }
+    const url = URL.createObjectURL(await res.blob());
+    if (pvUrl) URL.revokeObjectURL(pvUrl); pvUrl = url;
+    $('pvMsg').hidden = true; const f = $('pvFrame'); f.hidden = false; f.src = url;
+  } catch (e) { pvShow('Cannot reach the preview host (' + e.message + '). Is it still running?', true); }
+}
+$('bPreview').onclick = preview;
+$('pvRefresh').onclick = preview;
+$('pvClose').onclick = () => $('pvDlg').close();
+$('pvPick').onclick = () => $('pvFile').click();
+$('pvClear').onclick = () => { sampleData = null; sampleName = ''; try { localStorage.removeItem('clio.sampleData'); localStorage.removeItem('clio.sampleName'); } catch { } preview(); };
+$('pvFile').onchange = async ev => {
+  const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+  try {
+    const text = await f.text(), obj = JSON.parse(text);
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('the file must contain a JSON object');
+    sampleData = obj; sampleName = f.name;
+    try { if (text.length < 2e6) { localStorage.setItem('clio.sampleData', text); localStorage.setItem('clio.sampleName', f.name); } } catch { }
+    preview();
+  } catch (e) { toast('Not usable as sample data: ' + e.message); }
+};
 $('bJson').onclick = () => { $('jsonText').value = serialize(); $('jsonErr').textContent = ''; $('jsonDlg').showModal(); };
 $('jsonClose').onclick = () => $('jsonDlg').close();
 $('jsonCopy').onclick = async () => { try { await navigator.clipboard.writeText($('jsonText').value); toast('Copied'); } catch (_) { $('jsonText').select(); } };

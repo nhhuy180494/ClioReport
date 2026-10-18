@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <Description>Local host for the ClioReport designer: serves the web designer and renders PDF previews.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ClioReport.Core\ClioReport.Core.csproj" />
+    <ProjectReference Include="..\ClioReport.Pdf\ClioReport.Pdf.csproj" />
+  </ItemGroup>
+</Project>

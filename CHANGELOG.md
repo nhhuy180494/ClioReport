@@ -3,7 +3,10 @@
 ## Unreleased
 
 - Text elements: `underline` and `rotate` (0, 90, 270).
-- `src/ClioReport.Designer`: single-file web designer for report JSON (canvas, properties, undo/redo).
+- New element types `table` (columns, fixed rows or a collection, header, zebra rows, wrapping rows) and `list` (repeats an item template per item of a collection, `across`, `gap`). Both expand into plain text elements, so renderers need no change.
+- Fix: an element with width 0 (a vertical line) was rejected by the padding check.
+- `src/ClioReport.Designer`: web designer for report JSON (canvas, outline, ruler, properties, undo/redo, drag elements from the toolbar, multi-select with align/distribute/shared style).
+- Designer PDF preview: `dotnet run --project src/ClioReport.Designer` serves the designer and renders `POST /api/preview` with ClioReport.Pdf; sample data is a JSON file (see `samples/GoodsReceipt/goods-receipt.data.json`).
 - New package `ClioReport.Rdlc`: `RdlcImporter` converts an `.rdlc`/`.rdl` report (Tablix, row groups, page header/footer, text boxes, lines) into a `ReportDefinition` and lists what it skipped.
 
 ## 0.1.0-alpha.3

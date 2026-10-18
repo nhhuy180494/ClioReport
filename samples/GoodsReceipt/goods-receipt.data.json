@@ -1,0 +1,40 @@
+{
+  "DocNo": "1",
+  "DocNo2": "1",
+  "Date": "2026-10-15",
+  "Dept": "[]",
+  "Fullname": "[ku19] 민수 김",
+  "Vendor": "[S04093] 주식회사 남동금속",
+  "Address": "",
+  "TaxCode": "",
+  "Tel": "",
+  "No": "0",
+  "Currency": "",
+  "Subtotal": 106250000,
+  "Tax": 0,
+  "Total": 106250000,
+  "items": [
+    {
+      "Code": "M-AL-A071",
+      "Name": "(M)원자재(구매)/알루미늄/해당없음/해당없음/Aluminum/골드반무광/홈온(길이21.2mm)-(BELLAZ_BBW 8종)/",
+      "Barcode": "261015-M-01",
+      "Unit": "EA",
+      "Image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAsCAIAAABaPSmoAAAA6UlEQVR4nO3Tyw3EIAxFUZdNJRSR1mhiFggpmTjGnww2I781oHsWQNt84B1gXQK8lwDvxQIcY/wrUQAHNs7FBLwxtJ5pSMAb2x7Qdv8D7Q8AfaL0vlgAxRLgvQR4LwHeS4Bqdcz+lAOgXmd8bTWgYrM8uBSA1hsNVkAZm54k6i0GE6BcR5yc1qsNekDBZqnXGZQAtB41iOoVBjGASL8zFPVSgwzArO9T14sMAsDKer6BC1hfzzSwAF71HMMEIEr/Rf3UQAGC1NOGR0CoesKAAwLWPxkQQNh61ACW9PX1dwNsV/9lgB3rz4YP3twJvkiW9I4AAAAASUVORK5CYII=",
+      "Qty": 39410,
+      "Price": 120,
+      "Amount": 0,
+      "Remark": ""
+    },
+    {
+      "Code": "M-GL-B002",
+      "Name": "Kính cường lực 5mm, cắt theo bản vẽ số 12 (hàng dễ vỡ)",
+      "Barcode": "261015-M-02",
+      "Unit": "PCS",
+      "Image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAsCAIAAABaPSmoAAAA6UlEQVR4nO3Tyw3EIAxFUZdNJRSR1mhiFggpmTjGnww2I781oHsWQNt84B1gXQK8lwDvxQIcY/wrUQAHNs7FBLwxtJ5pSMAb2x7Qdv8D7Q8AfaL0vlgAxRLgvQR4LwHeS4Bqdcz+lAOgXmd8bTWgYrM8uBSA1hsNVkAZm54k6i0GE6BcR5yc1qsNekDBZqnXGZQAtB41iOoVBjGASL8zFPVSgwzArO9T14sMAsDKer6BC1hfzzSwAF71HMMEIEr/Rf3UQAGC1NOGR0CoesKAAwLWPxkQQNh61ACW9PX1dwNsV/9lgB3rz4YP3twJvkiW9I4AAAAASUVORK5CYII=",
+      "Qty": 1250,
+      "Price": 85000,
+      "Amount": 106250000,
+      "Remark": ""
+    }
+  ]
+}
