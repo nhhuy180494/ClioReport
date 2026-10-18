@@ -13,7 +13,7 @@ Visual Studio runs on .NET Framework, so it cannot load the .NET 8 ClioReport li
 
 ## Requirements (on the machine that uses the extension)
 
-- Visual Studio 2022 or 2026 (x64 or Arm64). The extension targets the 17.x API, which Visual Studio 2026 loads without changes.
+- Visual Studio 2022 or 2026 (x64). The extension targets the 17.x API, which Visual Studio 2026 loads without changes.
 - .NET 8 runtime (`dotnet` on the path, or in `Program Files\dotnet`)
 - WebView2 runtime (already installed with current Windows and Microsoft Edge)
 

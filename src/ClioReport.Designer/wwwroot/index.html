@@ -125,6 +125,14 @@ textarea { min-height: 52px; resize: vertical; font: 12px ui-monospace, Consolas
 dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); width: min(780px, 92vw); box-shadow: var(--shadow); }
 dialog::backdrop { background: rgba(10,14,22,.45); }
 dialog textarea { width: 100%; height: 55vh; font: 12px ui-monospace, Consolas, monospace; }
+#tbDlg { width: min(900px, 94vw); }
+.tbgrid { display: grid; grid-template-columns: 24px 1.2fr 1.2fr 78px 64px 104px 76px; gap: 6px; align-items: center; margin-bottom: 5px; }
+.tbgrid.head { color: var(--muted); font-size: 11px; font-weight: 650; }
+#tbCols { max-height: 44vh; overflow: auto; padding-right: 4px; }
+#tbCols input[type=text], #tbCols input[type=number], #tbCols select { width: 100%; min-width: 0; }
+#tbOpts { gap: 16px; }
+#tbOpts [hidden] { display: none; }
+#tbOpts label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #1b2230; color: #fff;
   padding: 7px 14px; border-radius: 9px; opacity: 0; transition: opacity .2s; pointer-events: none; box-shadow: var(--shadow); }
 #toast.on { opacity: .96; }
@@ -306,6 +314,21 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
   <ul id="rdlcWarn"></ul>
   <div class="actions" style="justify-content:flex-end"><button id="rdlcOk" class="primary">OK</button></div>
 </dialog>
+<dialog id="tbDlg">
+  <h3 style="margin:0 0 4px">Table wizard</h3>
+  <p class="hint" id="tbHint" style="margin:0 0 10px"></p>
+  <div class="row"><label>Source</label><div><input id="tbSource" type="text" list="tbSources" placeholder="collection name, e.g. items"><datalist id="tbSources"></datalist></div></div>
+  <div class="tbgrid head"><span></span><span>Field / expression</span><span>Header</span><span>Align</span><span>Width</span><span>Format</span><span></span></div>
+  <div id="tbCols"></div>
+  <div class="actions"><button id="tbAdd" class="ghost">Add column</button><span id="tbSum" class="hint" style="align-self:center"></span></div>
+  <div class="actions" id="tbOpts">
+    <label><input type="checkbox" id="tbHeader" checked> Header row</label>
+    <label><input type="checkbox" id="tbZebra" checked> Zebra rows</label>
+    <label><input type="checkbox" id="tbBorder" checked> Border</label>
+    <label id="tbFitWrap"><input type="checkbox" id="tbFit" checked> Fit to band width</label>
+  </div>
+  <div class="actions" style="justify-content:flex-end"><button id="tbCancel" class="ghost">Cancel</button><button id="tbOk" class="primary">Insert table</button></div>
+</dialog>
 <div id="toast"></div>
 
 <script>
@@ -436,6 +459,7 @@ const ICONS = {
   vTop: '<path d="M5 5h14"/><rect x="9" y="8" width="6" height="10" rx="1"/>', vMid: '<path d="M5 12h14"/><rect x="9" y="6" width="6" height="12" rx="1"/>',
   vBot: '<path d="M5 19h14"/><rect x="9" y="6" width="6" height="10" rx="1"/>',
   up: '<path d="M12 19V5M6 11l6-6 6 6"/>', down: '<path d="M12 5v14M6 13l6 6 6-6"/>', back: '<path d="M15 6l-6 6 6 6"/>',
+  wand: '<path d="M5 19L15 9M14 4v3M12.5 5.5h3M19 11v3M17.5 12.5h3M4 6h2M5 5v2"/>',
   table: '<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 10h16M4 14.5h16M10 5v14"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="5" cy="6" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="18" r="1"/>',
   layers: '<path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/>',
@@ -513,6 +537,133 @@ function ensureShape(e) {
     e.items = e.items || []; e.source = e.source || 'lines'; if (!e.height) e.height = 8;
   }
 }
+
+// ---------------------------------------------------------------- table wizard
+const tw = { target: null, cols: [], collections: [], prevSource: '' };
+const TW_FORMATS = [['', 'None'], ['N0', '1,234'], ['N2', '1,234.50'], ['dd/MM/yyyy', 'dd/MM/yyyy'], ['yyyy-MM-dd', 'yyyy-MM-dd']];
+const isRows = v => Array.isArray(v) && v.length > 0 && v[0] && typeof v[0] === 'object' && !Array.isArray(v[0]);
+function twCollections() {
+  const out = [];
+  if (!sampleData || typeof sampleData !== 'object' || Array.isArray(sampleData)) return out;
+  const add = (name, rows) => { if (!out.some(c => c.name === name)) out.push({ name, rows }); };
+  for (const [k, v] of Object.entries(sampleData)) if (isRows(v)) add(k, v);
+  for (const c of [...out]) for (const [k, v] of Object.entries(c.rows[0])) if (isRows(v)) add(k, v);
+  return out;
+}
+function twPretty(key) {
+  const t = String(key).replace(/[_\-]+/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim();
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+}
+function twFieldsOf(rows) {
+  const keys = [];
+  for (const r of rows.slice(0, 50)) for (const k of Object.keys(r)) if (!keys.includes(k)) keys.push(k);
+  const out = [];
+  for (const k of keys) {
+    const vals = rows.slice(0, 50).map(r => r[k]);
+    if (vals.some(v => v !== null && typeof v === 'object')) continue;                            // nested rows / objects
+    if (vals.some(v => typeof v === 'string' && v.startsWith('data:image/'))) continue;           // pictures
+    const real = vals.filter(v => v !== null && v !== undefined && v !== '');
+    const kind = !real.length ? 'text' : real.every(v => typeof v === 'number') ? 'number'
+      : real.every(v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) ? 'date' : 'text';
+    out.push({ key: k, kind });
+  }
+  return out;
+}
+function twColFor(f, on) {
+  return { on, field: f.key, header: twPretty(f.key), align: f.kind === 'number' ? 'right' : 'left', width: f.kind === 'number' ? 25 : f.kind === 'date' ? 28 : 0, format: '' };
+}
+function twFromSource(name) {
+  const c = tw.collections.find(x => x.name === name);
+  return c ? twFieldsOf(c.rows).map(f => twColFor(f, true)) : null;
+}
+function twFromColumns(e) {
+  return (e.columns || []).map(c => {
+    const m = /^Format\(\s*([A-Za-z_][\w.]*)\s*,\s*'([^']*)'\s*\)$/.exec(c.expression || '');
+    return { on: true, field: m ? m[1] : (c.expression || ''), header: c.header || '', align: c.align || 'left', width: c.width || 0, format: m ? m[2] : '' };
+  });
+}
+function twBuildColumns() {
+  return tw.cols.filter(c => c.on && c.field.trim()).map(c => {
+    const f = c.field.trim(), col = { header: c.header, expression: c.format ? `Format(${f}, '${c.format.replace(/'/g, "\\'")}')` : f };
+    if (c.width > 0) col.width = c.width;
+    if (c.align && c.align !== 'left') col.align = c.align;
+    return col;
+  });
+}
+function twRender() {
+  const box = $('tbCols'); box.textContent = '';
+  tw.cols.forEach((c, i) => {
+    const row = document.createElement('div'); row.className = 'tbgrid';
+    const on = Object.assign(document.createElement('input'), { type: 'checkbox', checked: c.on }); on.onchange = () => { c.on = on.checked; twSummary(); };
+    const fld = Object.assign(document.createElement('input'), { type: 'text', value: c.field, placeholder: 'field' }); fld.oninput = () => { c.field = fld.value; twSummary(); };
+    const hd = Object.assign(document.createElement('input'), { type: 'text', value: c.header }); hd.oninput = () => { c.header = hd.value; };
+    const al = document.createElement('select'); al.innerHTML = '<option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>'; al.value = c.align; al.onchange = () => { c.align = al.value; };
+    const w = Object.assign(document.createElement('input'), { type: 'number', value: c.width || '', min: 0, step: 1, placeholder: 'auto' }); w.oninput = () => { c.width = parseFloat(w.value) || 0; };
+    const fm = document.createElement('select'); fm.innerHTML = TW_FORMATS.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+    if (c.format && !TW_FORMATS.some(([v]) => v === c.format)) fm.insertAdjacentHTML('beforeend', `<option value="${c.format.replace(/"/g, '&quot;')}">${c.format.replace(/</g, '&lt;')}</option>`);
+    fm.value = c.format; fm.onchange = () => { c.format = fm.value; };
+    const mv = document.createElement('div'); mv.style.display = 'flex';
+    mv.append(btn(ico('up'), () => { if (i) { [tw.cols[i - 1], tw.cols[i]] = [tw.cols[i], tw.cols[i - 1]]; twRender(); } }, 'ghost icon'),
+      btn(ico('down'), () => { if (i < tw.cols.length - 1) { [tw.cols[i + 1], tw.cols[i]] = [tw.cols[i], tw.cols[i + 1]]; twRender(); } }, 'ghost icon'));
+    row.append(on, fld, hd, al, w, fm, mv); box.append(row);
+  });
+  twSummary();
+}
+function twSummary() {
+  const n = tw.cols.filter(c => c.on && c.field.trim()).length;
+  $('tbSum').textContent = n + ' column' + (n === 1 ? '' : 's');
+  $('tbOk').disabled = n === 0;
+}
+function openTableWizard(target) {
+  tw.target = target; tw.collections = twCollections();
+  $('tbSources').innerHTML = tw.collections.map(c => `<option value="${c.name.replace(/"/g, '&quot;')}"></option>`).join('');
+  const source = target ? (target.source || '') : (tw.collections[0]?.name || 'items');
+  $('tbSource').value = source; tw.prevSource = source;
+  if (target) {
+    tw.cols = twFromColumns(target);
+    const known = tw.collections.find(c => c.name === source);
+    if (known) for (const f of twFieldsOf(known.rows)) if (!tw.cols.some(c => c.field === f.key)) tw.cols.push(twColFor(f, false));
+    $('tbHeader').checked = target.showHeader !== false; $('tbZebra').checked = !!target.altFill; $('tbBorder').checked = target.border !== false;
+  } else {
+    tw.cols = twFromSource(source) || [];
+    $('tbHeader').checked = $('tbZebra').checked = $('tbBorder').checked = true;
+  }
+  $('tbFit').checked = true; $('tbFitWrap').hidden = !!target;
+  $('tbOk').textContent = target ? 'Apply to table' : 'Insert table';
+  $('tbHint').textContent = tw.collections.length
+    ? 'Fields come from the sample data (' + sampleName + '). Tick the ones to show; a field can also be an expression.'
+    : 'No sample data loaded, so add the columns yourself (Preview > Sample data… loads a JSON file whose fields then appear here).';
+  twRender();
+  $('tbDlg').showModal();
+}
+$('tbSource').onchange = () => {
+  const name = $('tbSource').value.trim(), cols = twFromSource(name);
+  if (cols && name !== tw.prevSource) { tw.cols = cols; twRender(); }
+  tw.prevSource = name;
+};
+$('tbAdd').onclick = () => { tw.cols.push({ on: true, field: '', header: 'Column' + (tw.cols.length + 1), align: 'left', width: 0, format: '' }); twRender(); };
+$('tbCancel').onclick = () => $('tbDlg').close();
+$('tbOk').onclick = () => {
+  const columns = twBuildColumns(), source = $('tbSource').value.trim() || 'items';
+  const style = { source, columns, showHeader: $('tbHeader').checked, altFill: $('tbZebra').checked ? '#F5F7FA' : '', border: $('tbBorder').checked };
+  $('tbDlg').close();
+  if (tw.target) {
+    const e = tw.target;
+    delete e.rows; e.source = source; e.columns = columns;
+    if (style.showHeader) delete e.showHeader; else e.showHeader = false;
+    if (style.altFill) e.altFill = style.altFill; else delete e.altFill;
+    e.border = style.border;
+    commit(); renderAll(); toast('Table updated');
+  } else {
+    const bi = sel.kind === 'report' ? def.bands.findIndex(b => b.type === 'detail') : sel.b;
+    const band = def.bands[bi < 0 ? 0 : bi];
+    const extra = { source, columns, border: style.border, fill: '#EEEEEE', padding: 1.5, rowHeight: 6 };
+    if (!style.showHeader) extra.showHeader = false;
+    if (style.altFill) extra.altFill = style.altFill;
+    if (band && $('tbFit').checked) extra.width = bandWidth(band);
+    addElement('table', undefined, extra);
+  }
+};
 
 // ---------------------------------------------------------------- canvas
 function renderCanvas() {
@@ -756,6 +907,8 @@ function renderTools() {
     b.ondragstart = ev => { ev.dataTransfer.setData('text/clio-type', type); ev.dataTransfer.setData('text/plain', type); ev.dataTransfer.effectAllowed = 'copy'; document.body.classList.add('dragging'); };
     b.ondragend = () => { document.body.classList.remove('dragging'); document.querySelectorAll('.droptarget').forEach(x => x.classList.remove('droptarget')); };
   }
+  const tw0 = document.createElement('button'); tw0.className = 'rbtn'; tw0.innerHTML = ico('wand');
+  tw0.dataset.tip = 'Table wizard: pick the fields of a collection'; tw0.setAttribute('aria-label', 'Table wizard'); tw0.onclick = () => openTableWizard(null); r.append(tw0);
   const sep = document.createElement('div'); sep.className = 'sep'; r.append(sep);
   const bm = document.createElement('button'); bm.className = 'rbtn'; bm.innerHTML = ico('layers');
   bm.dataset.tip = 'Add band'; bm.setAttribute('aria-label', 'Add band');
@@ -844,7 +997,7 @@ function buildRuler() {
   return r;
 }
 
-function addElement(type, at) {
+function addElement(type, at, extra) {
   let bi = at ? at.bi : sel.kind === 'report' ? def.bands.findIndex(b => b.type === 'detail') : sel.b;
   if (bi < 0) bi = 0;
   if (!def.bands[bi]) { toast('Add a band first'); return; }
@@ -874,6 +1027,7 @@ function addElement(type, at) {
       items: [{ x: 0, y: 1, width: 60, height: 5, expression: 'name' }] }
   }[type];
   if (at) { proto.x = Math.max(0, Math.min(snapv(at.x), Math.max(0, parentW - Math.min(proto.width, parentW)))); proto.y = Math.max(0, Math.min(snapv(at.y), Math.max(0, parentH - proto.height))); }
+  if (extra) Object.assign(proto, extra);
   ensureShape(proto);
   container.push(proto);
   commit(); select({ kind: 'element', b: bi, path: [...basePath, container.length - 1] });
@@ -1123,6 +1277,7 @@ function elementProps(p, e) {
 }
 
 function tableProps(p, e) {
+  p.append(btn(ico('wand') + 'Table wizard…', () => openTableWizard(e)));
   h4(p, 'Columns');
   const cols = e.columns = e.columns || [];
   cols.forEach((c, i) => {
@@ -1413,7 +1568,7 @@ window.addEventListener('keydown', ev => {
 });
 
 // test hook + startup
-window.__designer = { openFromHost: (text, name) => { if (load(text, name, null)) { hostBound = true; hostDirty = null; refreshButtons(); } }, get sel() { return sel; }, get multi() { return multi; }, get def() { return def; }, set def(v) { def = v; }, clean: () => clean(def), load, select, renderAll };
+window.__designer = { openTableWizard, setSample: (v, n) => { sampleData = v; sampleName = n || 'test'; }, openFromHost: (text, name) => { if (load(text, name, null)) { hostBound = true; hostDirty = null; refreshButtons(); } }, get sel() { return sel; }, get multi() { return multi; }, get def() { return def; }, set def(v) { def = v; }, clean: () => clean(def), load, select, renderAll };
 initChrome();
 renderAll();
 fitZoom();

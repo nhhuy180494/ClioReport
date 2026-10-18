@@ -41,6 +41,9 @@
     <Content Include="Host\**\*" Exclude="Host\**\*.pdb">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
+    <Content Include="LICENSE.txt"><IncludeInVSIX>true</IncludeInVSIX></Content>
+    <Content Include="Resources\icon.png"><IncludeInVSIX>true</IncludeInVSIX></Content>
+    <Content Include="Resources\preview.png"><IncludeInVSIX>true</IncludeInVSIX></Content>
     <Content Include="ItemTemplates\**\*.zip">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>

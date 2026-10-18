@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Designer: *Table wizard* (wand button in the left rail, or *Table wizard…* in a table's properties). Pick a collection and its fields from the loaded sample data (or add columns by hand), set header, alignment, width and format per column, then insert a new table or apply the result to the selected one.
+
 ## 0.1.0-alpha.5 (2026-10-18)
 
 - `src/ClioReport.Vsix`: Visual Studio extension (2022 and newer; built with `build-vsix.ps1`, not part of `ClioReport.sln`; the `.vsix` is attached to the GitHub release). Report files use the `.clio` extension (JSON inside; `.json` still opens in the web designer).
