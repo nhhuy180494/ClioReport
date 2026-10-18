@@ -266,7 +266,7 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     <button id="bJson" class="ghost"></button>
     <button id="bPreview" class="ghost" title="Preview as PDF (needs the local host)"></button>
     <button id="bSave" class="primary" title="Save (Ctrl+S)"></button>
-    <input type="file" id="fileInput" accept=".json,application/json" hidden>
+    <input type="file" id="fileInput" accept=".clio,.json,application/json" hidden>
   </div>
   <div id="main">
     <div id="rail"></div>
@@ -474,6 +474,7 @@ function redo() { if (!redoStack.length) return; undoStack.push(lastSnap); resto
 function refreshButtons() {
   $('bUndo').disabled = !undoStack.length; $('bRedo').disabled = !redoStack.length;
   const d = $('dirty'); if (d) d.hidden = lastSnap === savedSnap;
+  if (hostBound && hostDirty !== (lastSnap !== savedSnap)) { hostDirty = lastSnap !== savedSnap; hostPost(hostDirty ? 'dirty' : 'clean'); }
 }
 let toastTimer = 0;
 function toast(msg, ms = 1800) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), ms); }
@@ -1282,15 +1283,19 @@ async function saveAs() {
   const text = serialize();
   if (window.showSaveFilePicker) {
     try {
-      const h = await window.showSaveFilePicker({ suggestedName: (def.name || 'report') + '.json', types: [{ description: 'ClioReport JSON', accept: { 'application/json': ['.json'] } }] });
+      const h = await window.showSaveFilePicker({ suggestedName: (def.name || 'report') + '.clio', types: [{ description: 'ClioReport report', accept: { 'application/json': ['.clio'] } }] });
       const w = await h.createWritable(); await w.write(text); await w.close();
       fileHandle = h; fileName = h.name; savedSnap = lastSnap; renderAll(); toast('Saved'); return;
     } catch (e) { if (e.name === 'AbortError') return; }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  a.download = (def.name || 'report') + '.json'; a.click(); URL.revokeObjectURL(a.href); savedSnap = lastSnap; refreshButtons(); toast('Downloaded');
+  a.download = (def.name || 'report') + '.clio'; a.click(); URL.revokeObjectURL(a.href); savedSnap = lastSnap; refreshButtons(); toast('Downloaded');
 }
+// Inside the Visual Studio extension (WebView2) the file belongs to VS: saving posts the text to it instead of using the browser.
+let hostBound = false, hostDirty = null;
+const hostPost = m => { try { window.chrome.webview.postMessage(m); } catch (_) { } };
 async function save() {
+  if (hostBound) { hostPost('save\n' + serialize()); savedSnap = lastSnap; refreshButtons(); toast('Saved'); return; }
   if (!fileHandle) return saveAs();
   try { const w = await fileHandle.createWritable(); await w.write(serialize()); await w.close(); savedSnap = lastSnap; refreshButtons(); toast('Saved'); }
   catch (e) { return saveAs(); }
@@ -1298,7 +1303,7 @@ async function save() {
 async function openFile() {
   if (window.showOpenFilePicker) {
     try {
-      const [h] = await window.showOpenFilePicker({ types: [{ description: 'ClioReport JSON', accept: { 'application/json': ['.json'] } }] });
+      const [h] = await window.showOpenFilePicker({ types: [{ description: 'ClioReport report', accept: { 'application/json': ['.clio', '.json'] } }] });
       const f = await h.getFile(); load(await f.text(), f.name, h); return;
     } catch (e) { if (e.name === 'AbortError') return; }
   }
@@ -1349,7 +1354,7 @@ $('rdlcInput').onchange = async ev => {
     const res = await fetch('api/import-rdlc', { method: 'POST', body: await f.arrayBuffer() });
     if (!res.ok) { toast('Cannot import: ' + await res.text(), 6000); return; }
     const out = await res.json();
-    if (!load(out.report, f.name.replace(/\.(rdlc|rdl|xml)$/i, '') + '.json', null)) return;
+    if (!load(out.report, f.name.replace(/\.(rdlc|rdl|xml)$/i, '') + '.clio', null)) return;
     $('rdlcSum').textContent = f.name + ': imported' + (out.warnings.length ? ', ' + out.warnings.length + ' thing(s) need your attention.' : ' with no warnings.');
     const ul = $('rdlcWarn'); ul.textContent = '';
     for (const w of out.warnings) { const li = document.createElement('li'); li.textContent = w; ul.append(li); }
@@ -1408,7 +1413,7 @@ window.addEventListener('keydown', ev => {
 });
 
 // test hook + startup
-window.__designer = { get sel() { return sel; }, get multi() { return multi; }, get def() { return def; }, set def(v) { def = v; }, clean: () => clean(def), load, select, renderAll };
+window.__designer = { openFromHost: (text, name) => { if (load(text, name, null)) { hostBound = true; hostDirty = null; refreshButtons(); } }, get sel() { return sel; }, get multi() { return multi; }, get def() { return def; }, set def(v) { def = v; }, clean: () => clean(def), load, select, renderAll };
 initChrome();
 renderAll();
 fitZoom();

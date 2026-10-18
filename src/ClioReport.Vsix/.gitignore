@@ -1,0 +1,5 @@
+Host/
+webview2/
+bin/
+obj/
+ItemTemplates/**/*.zip

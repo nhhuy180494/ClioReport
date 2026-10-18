@@ -1,0 +1,64 @@
+<Project>
+  <!-- Visual Studio 2022 extension. Not part of ClioReport.sln: build it with build-vsix.ps1 (see README.md). -->
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ClioReport.Vsix</RootNamespace>
+    <AssemblyName>ClioReport.Vsix</AssemblyName>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <UseCodebase>true</UseCodebase>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
+    <DeployExtension>false</DeployExtension>
+    <CreateVsixContainer>true</CreateVsixContainer>
+    <VsixContainerDirectory>$(MSBuildProjectDirectory)\bin\Release\</VsixContainerDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.32112.339" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="*" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2420.47" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Design" />
+    <None Include="source.extension.vsixmanifest"><SubType>Designer</SubType></None>
+    <VSCTCompile Include="ClioReportPackage.vsct"><ResourceName>Menus.ctmenu</ResourceName></VSCTCompile>
+  </ItemGroup>
+
+  <!-- Filled by build-vsix.ps1 before the build: the published designer host (framework-dependent) and WebView2Loader.dll. -->
+  <ItemGroup>
+    <Content Include="Host\**\*" Exclude="Host\**\*.pdb">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="ItemTemplates\**\*.zip">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="webview2\**\*.dll">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+  </ItemGroup>
+
+  <!-- SDK-style projects must import the VSSDK targets themselves (the BuildTools package only hooks into them).
+       Microsoft.VsSDK.targets ships with the Visual Studio install (or inside the BuildTools package). -->
+  <PropertyGroup>
+    <VsSdkTargetsFile Condition="Exists('$(VsSDKInstall)\Microsoft.VsSDK.targets')">$(VsSDKInstall)\Microsoft.VsSDK.targets</VsSdkTargetsFile>
+    <VsSdkTargetsFile Condition="'$(VsSdkTargetsFile)' == '' And Exists('$(MSBuildToolsPath)\..\..\..\Microsoft\VisualStudio\v$(VisualStudioVersion)\VSSDK\Microsoft.VsSDK.targets')">$(MSBuildToolsPath)\..\..\..\Microsoft\VisualStudio\v$(VisualStudioVersion)\VSSDK\Microsoft.VsSDK.targets</VsSdkTargetsFile>
+    <VsSdkTargetsFile Condition="'$(VsSdkTargetsFile)' == '' And Exists('$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v17.0\VSSDK\Microsoft.VsSDK.targets')">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v17.0\VSSDK\Microsoft.VsSDK.targets</VsSdkTargetsFile>
+  </PropertyGroup>
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <Import Project="$(VsSdkTargetsFile)" Condition="'$(VsSdkTargetsFile)' != ''" />
+  <Target Name="ReportVsSdkTargets" BeforeTargets="CoreCompile">
+    <Message Importance="high" Text="VSSDK targets: '$(VsSdkTargetsFile)' (MSBuildToolsPath=$(MSBuildToolsPath), VisualStudioVersion=$(VisualStudioVersion))" />
+  </Target>
+</Project>

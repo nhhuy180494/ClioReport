@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "name": "NewReport",
+  "dataSource": "items",
+  "page": { "width": 210, "height": 297, "margin": 10, "columns": 1, "columnGap": 0 },
+  "groups": [],
+  "aggregates": [],
+  "bands": [
+    {
+      "type": "reportHeader",
+      "height": 14,
+      "elements": [
+        { "x": 0, "y": 3, "width": 190, "height": 8, "align": "center", "bold": true, "fontSize": 16, "text": "Report title" }
+      ]
+    },
+    {
+      "type": "detail",
+      "height": 7,
+      "elements": [
+        { "x": 0, "y": 1, "width": 60, "height": 5, "expression": "name" }
+      ]
+    }
+  ]
+}

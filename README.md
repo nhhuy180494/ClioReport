@@ -67,6 +67,7 @@ The PDF package uses PDFsharp Core, which loads no fonts by itself. By default `
 - `src/ClioReport.Core`: JSON model, expression sandbox, layout engine, `IDataContext`. No dependencies.
 - `src/ClioReport.Pdf`: PDF renderer (PDFsharp), kept separate so Core stays dependency-free.
 - `src/ClioReport.Designer`: web designer for the JSON. `dotnet run --project src/ClioReport.Designer` and open http://localhost:5178 for the editor with PDF preview (or open `wwwroot/index.html` directly to edit without preview).
+- `src/ClioReport.Vsix`: Visual Studio 2022 extension hosting the designer (see its README; build with `build-vsix.ps1`).
 - `src/ClioReport.Rdlc`: imports `.rdlc` reports (common subset, with warnings); see `docs/README.md`.
 - `tests/ClioReport.Tests`, `samples/PhieuXuatKho`, `docs`.
 

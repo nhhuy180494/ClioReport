@@ -1,0 +1,15 @@
+<VSTemplate Version="3.0.0" Type="Item" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005">
+  <TemplateData>
+    <Name>ClioReport Report</Name>
+    <Description>A blank ClioReport report (.clio). Double-click it to open the visual designer.</Description>
+    <ProjectType>CSharp</ProjectType>
+    <SortOrder>10</SortOrder>
+    <DefaultName>Report.clio</DefaultName>
+    <ProvideDefaultName>true</ProvideDefaultName>
+    <TemplateID>ClioReport.BlankReport</TemplateID>
+    <CreateInPlace>true</CreateInPlace>
+  </TemplateData>
+  <TemplateContent>
+    <ProjectItem ReplaceParameters="false" TargetFileName="$fileinputname$.clio">Blank.clio</ProjectItem>
+  </TemplateContent>
+</VSTemplate>

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `src/ClioReport.Vsix`: Visual Studio 2022 extension that opens report `.clio` files (JSON inside; `.json` still opens in the web designer) in the designer (WebView2, runs the designer host as a child process). Built with `build-vsix.ps1`; not part of `ClioReport.sln`.
+
+## 0.1.0-alpha.4 (2026-10-18)
+
 - Text elements: `underline` and `rotate` (0, 90, 270).
 - New element types `table` (columns, fixed rows or a collection, header, zebra rows, wrapping rows) and `list` (repeats an item template per item of a collection, `across`, `gap`). Both expand into plain text elements, so renderers need no change.
 - Fix: an element with width 0 (a vertical line) was rejected by the padding check.

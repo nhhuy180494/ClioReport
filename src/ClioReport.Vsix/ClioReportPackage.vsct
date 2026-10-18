@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidClioPackage">
+    <Groups>
+      <Group guid="guidClioCmdSet" id="ToolsGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS" />
+      </Group>
+      <Group guid="guidClioCmdSet" id="ItemGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE" />
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidClioCmdSet" id="OpenDesignerCmd" priority="0x0100" type="Button">
+        <Parent guid="guidClioCmdSet" id="ToolsGroup" />
+        <Strings><ButtonText>ClioReport Designer</ButtonText></Strings>
+      </Button>
+      <Button guid="guidClioCmdSet" id="OpenFileCmd" priority="0x0100" type="Button">
+        <Parent guid="guidClioCmdSet" id="ItemGroup" />
+        <CommandFlag>DynamicVisibility</CommandFlag>
+        <CommandFlag>DefaultInvisible</CommandFlag>
+        <Strings><ButtonText>Open in ClioReport Designer</ButtonText></Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidClioPackage" value="{37f51c2f-2d7f-4cce-9002-f0f183125a24}" />
+    <GuidSymbol name="guidClioCmdSet" value="{4ba6350c-86e8-4c3e-b993-4b1c62a2e097}">
+      <IDSymbol name="ToolsGroup" value="0x1020" />
+      <IDSymbol name="ItemGroup" value="0x1021" />
+      <IDSymbol name="OpenDesignerCmd" value="0x0100" />
+      <IDSymbol name="OpenFileCmd" value="0x0101" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

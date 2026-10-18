@@ -36,9 +36,9 @@ foreach (var w in result.Warnings) Console.WriteLine(w);
 File.WriteAllText("report.json", ReportSerializer.Serialize(result.Definition));
 ```
 
-- Imported: page size and margin, page header/footer, text boxes (value, font, bold/italic/underline, colours, fill, border, padding, alignment, `Format`), lines, rectangles, and one Tablix: header rows -> `columnHeader`, row groups -> groups with header/footer bands, details row -> `detail`, other rows -> `reportFooter`. Items above the Tablix -> `reportHeader`, below -> `reportFooter`. `DataSetName` becomes `dataSource`.
-- Expressions: `Fields!X.Value`, `Parameters!X.Value`, `Globals!PageNumber/TotalPages`, `&`, comparison and logic operators, `Sum/Count/Avg/Min/Max` (turned into `aggregates`, scoped to the named group), `UCase/LCase/Trim/Len/Round/Abs/Format`. Anything else (e.g. `IIf`, `Now()`) is skipped with a warning; the text box is left empty.
-- Not imported (warned): images, charts, subreports, column groups, row-group header cells, several Tablix, conditional visibility, per-side borders (all sides are drawn), multiple paragraphs, `CanGrow` (set `wrap` yourself and pass an `ITextMeasurer`).
+- Imported: page size and margin, page header/footer, text boxes (value, font, bold/italic/underline, colours, fill, border, padding, alignment, `Format`), lines, rectangles, and one Tablix: header rows and column-hierarchy header cells (including spanning headers) -> `columnHeader`, row groups -> groups with header/footer bands, details row -> `detail`, other rows -> `reportFooter`. Items above the Tablix -> `reportHeader`, below -> `reportFooter`. `DataSetName` becomes `dataSource`.
+- Expressions: `Fields!X.Value`, `Parameters!X.Value`, `Globals!PageNumber/TotalPages`, `&`, comparison and logic operators, `Sum/Count/Avg/Min/Max` (turned into `aggregates`, scoped to the named group), `IIf` (becomes `a ? b : c`), `First/Last(Fields!X.Value, "DataSet")` (becomes the plain field `X`: supply it as a root field), `UCase/LCase/Trim/Len/Round/Abs/Format`. Anything else (e.g. `Switch`, `Now()`) is skipped with a warning; the text box is left empty.
+- Not imported (warned): images, charts, subreports, column groups, row-group header cells, several Tablix, conditional visibility, per-side borders (all sides are drawn), text with several styles inside one paragraph (first run's style wins; stacked paragraphs with different styles become separate elements), `CanGrow` (set `wrap` yourself and pass an `ITextMeasurer`).
 - RDL 2005 `Table` is not read; open the file in Visual Studio and save it to upgrade it to Tablix.
 - Always review the result: the importer reports what it knows it skipped, not whether the layout looks right.
 
@@ -46,7 +46,7 @@ File.WriteAllText("report.json", ReportSerializer.Serialize(result.Definition));
 
 A single HTML file, no build step and no dependencies: open it in Chrome or Edge. It edits the same JSON the engine reads.
 
-- **Open / Save**: Chrome and Edge save back to the same file; other browsers download it. Drag a `.json` file onto the page to open it.
+- **Open / Save**: Chrome and Edge save back to the same file; other browsers download it. Reports are saved as `.clio` files (plain JSON inside; `.json` still opens). Drag a file onto the page to open it.
 - **Canvas**: bands are drawn to scale (mm). Drag to move, handles to resize, drag a band's bottom edge for its height. Arrow keys nudge (Shift = 5 mm), Alt disables snapping, Ctrl+Z / Ctrl+Y undo and redo, Ctrl+D duplicates, Delete removes.
 - **Panels**: left adds elements and bands (inserted in the usual order); right edits the selected element, band, or the report (page, groups, aggregates). `JSON...` shows and edits the raw file.
 - `table` and `list` elements are in the left panel. A table shows its columns and two sample rows; edit columns and the data source on the right. A list draws one item with a ghost of the next: with the list (or an element inside it) selected, adding an element puts it into the item template.
