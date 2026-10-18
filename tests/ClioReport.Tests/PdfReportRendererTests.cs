@@ -116,6 +116,9 @@ public class PdfReportRendererTests
         var barcode = RenderPdf("""{ "type": "barcode", "width": 60, "height": 8, "text": "PXK-20261018-0001" }""", new { }, options);
         var image = RenderPdf("""{ "type": "image", "width": 20, "height": 10, "expression": "logo" }""", new { Logo = png }, options);
 
+        var qr = RenderPdf("""{ "type": "qrcode", "width": 20, "height": 20, "text": "PXK-20261018-0001" }""", new { }, options);
+
+        Assert.True(qr.Length > plain.Length);
         Assert.True(barcode.Length > plain.Length);
         Assert.True(image.Length > plain.Length);
     }

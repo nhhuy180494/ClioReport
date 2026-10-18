@@ -36,6 +36,20 @@ public class ReportBarcodeImageTests
         Assert.Throws<ReportException>(() => Render(Barcode, new { Code = "Tiếng Việt" }));
 
     [Fact]
+    public void QrCode_CarriesValue()
+    {
+        var element = Render("""{ "type": "qrcode", "width": 20, "height": 20, "expression": "code" }""", new { Code = "PXK-1" });
+
+        Assert.Equal(ElementKind.QrCode, element.Kind);
+        Assert.Equal("PXK-1", element.Text);
+    }
+
+    [Fact]
+    public void QrCode_TooLongValue_Throws() =>
+        Assert.Throws<ReportException>(() => Render(
+            """{ "type": "qrcode", "width": 20, "height": 20, "expression": "code" }""", new { Code = new string('x', 3000) }));
+
+    [Fact]
     public void Image_ByteArrayValue_IsPassedThrough()
     {
         var bytes = new byte[] { 1, 2, 3 };

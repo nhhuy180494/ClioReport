@@ -32,6 +32,7 @@ public enum ElementKind
     Rect,
     /// <summary>Code 128 barcode of <c>Text</c>, scaled to fill the element width.</summary>
     Barcode,
+    QrCode,
     /// <summary>Image from <c>Image</c> bytes, or from the file path in <c>Text</c>; fitted inside the box.</summary>
     Image
 }

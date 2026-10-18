@@ -33,7 +33,7 @@ public sealed class BandDefinition
 
 public sealed class ElementDefinition
 {
-    /// <summary>Element kind: "text" (default), "line", "rect", "barcode" (Code 128) or "image".</summary>
+    /// <summary>Element kind: "text" (default), "line", "rect", "barcode" (Code 128), "qrcode" or "image".</summary>
     public string Type { get; set; } = "text";
 
     // Position/size relative to the band, in millimetres.

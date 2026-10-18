@@ -78,6 +78,7 @@ internal sealed class ReportRunner
         "line" => ElementKind.Line,
         "rect" => ElementKind.Rect,
         "barcode" => ElementKind.Barcode,
+        "qrcode" => ElementKind.QrCode,
         "image" => ElementKind.Image,
         _ => null
     };
@@ -337,6 +338,8 @@ internal sealed class ReportRunner
             }
             if (kind == ElementKind.Barcode)
                 CheckBarcode(band, text);
+            else if (kind == ElementKind.QrCode)
+                CheckQrCode(band, text);
 
             var elementHeight = e.Height;
             var lineHeight = 0.0;
@@ -351,6 +354,19 @@ internal sealed class ReportRunner
             items.Add(new PreparedElement(e, kind, text, elementHeight, lineHeight, image));
         }
         return items;
+    }
+
+    private static void CheckQrCode(BandDefinition band, string text)
+    {
+        if (text.Length == 0) return;
+        try
+        {
+            QrCode.Encode(text);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new ReportException($"{band.Type} band: cannot make a QR code from the text. {ex.Message}", ex);
+        }
     }
 
     private static void CheckBarcode(BandDefinition band, string text)

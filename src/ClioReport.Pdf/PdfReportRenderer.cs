@@ -49,6 +49,9 @@ public static class PdfReportRenderer
                     case ElementKind.Barcode:
                         DrawBarcode(gfx, e, rect);
                         break;
+                    case ElementKind.QrCode:
+                        DrawQrCode(gfx, e, rect);
+                        break;
                     case ElementKind.Image:
                         DrawImage(gfx, e, rect, images);
                         break;
@@ -96,6 +99,37 @@ public static class PdfReportRenderer
             var start = i;
             while (i < modules.Length && modules[i]) i++;
             gfx.DrawRectangle(XBrushes.Black, rect.X + start * unit, rect.Y, (i - start) * unit, rect.Height);
+        }
+    }
+
+    private static void DrawQrCode(XGraphics gfx, RenderedElement e, XRect rect)
+    {
+        if (e.Text.Length == 0) return;
+
+        var modules = QrCode.Encode(e.Text);
+        var count = modules.GetLength(0);
+        var unit = Math.Min(rect.Width, rect.Height) / count;
+        var size = unit * count;
+        var left = e.Align switch
+        {
+            TextAlign.Center => rect.X + (rect.Width - size) / 2,
+            TextAlign.Right => rect.Right - size,
+            _ => rect.X
+        };
+        for (var y = 0; y < count; y++)
+        {
+            for (var x = 0; x < count;)
+            {
+                if (!modules[y, x])
+                {
+                    x++;
+                    continue;
+                }
+
+                var start = x;
+                while (x < count && modules[y, x]) x++;
+                gfx.DrawRectangle(XBrushes.Black, left + start * unit, rect.Y + y * unit, (x - start) * unit, unit);
+            }
         }
     }
 
