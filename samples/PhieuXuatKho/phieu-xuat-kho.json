@@ -10,7 +10,9 @@
       { "x": 140, "y": 0, "width": 50, "height": 6, "align": "right", "expression": "'Ngày: ' + date" }
     ] },
     { "type": "reportHeader", "height": 14, "elements": [
-      { "x": 0, "y": 2, "width": 190, "height": 8, "align": "center", "expression": "title" }
+      { "x": 0, "y": 2, "width": 190, "height": 8, "align": "center", "expression": "title" },
+      { "type": "barcode", "x": 130, "y": 0, "width": 60, "height": 9, "expression": "docNo" },
+      { "x": 130, "y": 9.5, "width": 60, "height": 4, "align": "center", "expression": "docNo" }
     ] },
     { "type": "groupHeader", "group": "kho", "height": 7, "elements": [
       { "x": 0, "y": 0, "width": 190, "height": 6, "expression": "'Kho: ' + kho" }

@@ -29,10 +29,14 @@ public enum ElementKind
     /// <summary>Straight line from (X, Y) to (X + Width, Y + Height); Height 0 gives a horizontal rule.</summary>
     Line,
     /// <summary>Outlined rectangle.</summary>
-    Rect
+    Rect,
+    /// <summary>Code 128 barcode of <c>Text</c>, scaled to fill the element width.</summary>
+    Barcode,
+    /// <summary>Image from <c>Image</c> bytes, or from the file path in <c>Text</c>; fitted inside the box.</summary>
+    Image
 }
 
 public sealed record RenderedElement(
     double X, double Y, double Width, double Height, string Text,
     TextAlign Align = TextAlign.Left, ElementKind Kind = ElementKind.Text, double Thickness = 0.2,
-    double LineHeight = 0);
+    double LineHeight = 0, byte[]? Image = null);

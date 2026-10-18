@@ -13,4 +13,10 @@ public sealed class PdfRenderOptions
     /// in the report (e.g. Arial for Vietnamese). Defaults to arial.ttf in the system fonts folder.
     /// </summary>
     public string? FontFilePath { get; set; }
+
+    /// <summary>
+    /// Folder that image elements may load files from when their value is a path (resolved against this folder;
+    /// paths escaping it are rejected). Null disables path loading: supply images as byte[] instead.
+    /// </summary>
+    public string? ImageRoot { get; set; }
 }

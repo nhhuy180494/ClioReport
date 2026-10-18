@@ -77,6 +77,8 @@ internal sealed class ReportRunner
         "text" => ElementKind.Text,
         "line" => ElementKind.Line,
         "rect" => ElementKind.Rect,
+        "barcode" => ElementKind.Barcode,
+        "image" => ElementKind.Image,
         _ => null
     };
 
@@ -303,7 +305,7 @@ internal sealed class ReportRunner
     }
 
     private sealed record PreparedElement(
-        ElementDefinition Def, ElementKind Kind, string Text, double Height, double LineHeight);
+        ElementDefinition Def, ElementKind Kind, string Text, double Height, double LineHeight, byte[]? Image);
 
     /// <summary>Evaluates a band's elements. Wrapped text can make the band taller than its defined height.</summary>
     private List<PreparedElement> Prepare(BandDefinition band, IDataContext ctx, out double height)
@@ -313,9 +315,28 @@ internal sealed class ReportRunner
         foreach (var e in band.Elements)
         {
             var kind = KindOf(e.Type)!.Value;
-            var text = kind != ElementKind.Text ? ""
-                : !string.IsNullOrWhiteSpace(e.Expression) ? Values.Str(Eval(e.Expression, ctx))
-                : e.Text ?? "";
+            byte[]? image = null;
+            string text;
+            switch (kind)
+            {
+                case ElementKind.Line:
+                case ElementKind.Rect:
+                    text = "";
+                    break;
+                case ElementKind.Image when !string.IsNullOrWhiteSpace(e.Expression):
+                {
+                    // byte[] is the image itself; anything else is taken as a file path.
+                    var value = Eval(e.Expression!, ctx);
+                    image = value as byte[];
+                    text = image is null ? Values.Str(value) : "";
+                    break;
+                }
+                default:
+                    text = !string.IsNullOrWhiteSpace(e.Expression) ? Values.Str(Eval(e.Expression, ctx)) : e.Text ?? "";
+                    break;
+            }
+            if (kind == ElementKind.Barcode)
+                CheckBarcode(band, text);
 
             var elementHeight = e.Height;
             var lineHeight = 0.0;
@@ -327,9 +348,22 @@ internal sealed class ReportRunner
                 elementHeight = Math.Max(e.Height, lines.Count * lineHeight);
                 height = Math.Max(height, e.Y + elementHeight);
             }
-            items.Add(new PreparedElement(e, kind, text, elementHeight, lineHeight));
+            items.Add(new PreparedElement(e, kind, text, elementHeight, lineHeight, image));
         }
         return items;
+    }
+
+    private static void CheckBarcode(BandDefinition band, string text)
+    {
+        if (text.Length == 0) return;
+        try
+        {
+            Code128.Encode(text);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new ReportException($"{band.Type} band: cannot make a barcode from '{text}'. {ex.Message}", ex);
+        }
     }
 
     private void AddPrepared(RenderedPage page, List<PreparedElement> items, double top)
@@ -339,7 +373,7 @@ internal sealed class ReportRunner
             var e = item.Def;
             page.Add(new RenderedElement(
                 _def.Page.Margin + e.X, top + e.Y, e.Width, item.Height, item.Text, e.Align, item.Kind,
-                e.Thickness, item.LineHeight));
+                e.Thickness, item.LineHeight, item.Image));
         }
     }
 

@@ -20,7 +20,13 @@ internal static class SampleData
         }
 
         return new ObjectDataContext(
-            new { Company = "CÔNG TY TNHH MẪU", Title = "PHIẾU XUẤT KHO", Date = DateTime.Today.ToString("dd/MM/yyyy") },
+            new
+            {
+                Company = "CÔNG TY TNHH MẪU",
+                Title = "PHIẾU XUẤT KHO",
+                Date = DateTime.Today.ToString("dd/MM/yyyy"),
+                DocNo = $"PXK-{DateTime.Today:yyyyMMdd}-0001"
+            },
             new Dictionary<string, object> { ["items"] = items });
     }
 }

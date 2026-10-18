@@ -5,7 +5,7 @@ using PdfSharp.Pdf;
 
 namespace ClioReport.Pdf;
 
-/// <summary>Draws a <see cref="RenderedReport"/> to PDF. One font, no clipping.</summary>
+/// <summary>Draws a <see cref="RenderedReport"/> to PDF: text, lines, rectangles, Code 128 barcodes and images. One font, no clipping.</summary>
 public static class PdfReportRenderer
 {
     internal const double PointsPerMm = 72.0 / 25.4;
@@ -24,6 +24,7 @@ public static class PdfReportRenderer
         options ??= new PdfRenderOptions();
         EnsureFontResolver(options);
 
+        using var images = new ImageCache(options);
         using var document = new PdfDocument();
         var font = new XFont(options.FontFamily, options.FontSize);
 
@@ -44,6 +45,12 @@ public static class PdfReportRenderer
                         break;
                     case ElementKind.Rect:
                         gfx.DrawRectangle(PenOf(e), rect);
+                        break;
+                    case ElementKind.Barcode:
+                        DrawBarcode(gfx, e, rect);
+                        break;
+                    case ElementKind.Image:
+                        DrawImage(gfx, e, rect, images);
                         break;
                     default:
                     {
@@ -70,6 +77,43 @@ public static class PdfReportRenderer
         }
 
         document.Save(output, false);
+    }
+
+    private static void DrawBarcode(XGraphics gfx, RenderedElement e, XRect rect)
+    {
+        if (e.Text.Length == 0) return;
+
+        var modules = Code128.Encode(e.Text);
+        var unit = rect.Width / modules.Length;
+        for (var i = 0; i < modules.Length;)
+        {
+            if (!modules[i])
+            {
+                i++;
+                continue;
+            }
+
+            var start = i;
+            while (i < modules.Length && modules[i]) i++;
+            gfx.DrawRectangle(XBrushes.Black, rect.X + start * unit, rect.Y, (i - start) * unit, rect.Height);
+        }
+    }
+
+    private static void DrawImage(XGraphics gfx, RenderedElement e, XRect rect, ImageCache images)
+    {
+        var image = images.Get(e);
+        if (image is null || image.PointWidth <= 0 || image.PointHeight <= 0) return;
+
+        var scale = Math.Min(rect.Width / image.PointWidth, rect.Height / image.PointHeight);
+        var width = image.PointWidth * scale;
+        var height = image.PointHeight * scale;
+        var x = e.Align switch
+        {
+            TextAlign.Center => rect.X + (rect.Width - width) / 2,
+            TextAlign.Right => rect.Right - width,
+            _ => rect.X
+        };
+        gfx.DrawImage(image, x, rect.Y, width, height);
     }
 
     private static XPen PenOf(RenderedElement e) => new(XColors.Black, e.Thickness * PointsPerMm);
