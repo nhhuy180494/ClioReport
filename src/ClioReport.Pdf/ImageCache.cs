@@ -48,7 +48,8 @@ internal sealed class ImageCache : IDisposable
                 "or return the image as byte[] from the expression.");
 
         var root = Path.GetFullPath(_options.ImageRoot);
-        var full = Path.GetFullPath(Path.Combine(root, requested));
+        // "/uploads/logo.png" is a web-style path under the root, not the file system root (Path.Combine would drop the root).
+        var full = Path.GetFullPath(Path.Combine(root, requested.TrimStart('/', '\\')));
         var relative = Path.GetRelativePath(root, full);
         if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
             throw new InvalidOperationException($"Image path '{requested}' is outside PdfRenderOptions.ImageRoot.");

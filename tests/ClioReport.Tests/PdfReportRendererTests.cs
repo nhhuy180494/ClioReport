@@ -163,6 +163,31 @@ public class PdfReportRendererTests
     }
 
     [Fact]
+    public void ImagePath_WithLeadingSlash_IsRelativeToImageRoot()
+    {
+        var fontPath = FontPath();
+        if (fontPath is null) return;
+
+        var root = Path.Combine(Path.GetTempPath(), "clioreport-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "uploads"));
+        try
+        {
+            File.WriteAllBytes(Path.Combine(root, "uploads", "logo.png"), Convert.FromBase64String(PngBase64));
+            var options = new PdfRenderOptions { FontFilePath = fontPath, ImageRoot = root };
+
+            var plain = RenderPdf("""{ "type": "image", "width": 20, "height": 10, "text": "nope.png" }""", new { }, options);
+            var withLogo = RenderPdf("""{ "type": "image", "width": 20, "height": 10, "text": "/uploads/logo.png" }""", new { }, options);
+
+            // The placeholder (a missing file) embeds a font and no picture; a found picture is drawn instead of "No image".
+            Assert.NotEqual(plain.Length, withLogo.Length);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public void MissingImage_DrawsPlaceholder_InsteadOfFailing()
     {
         var fontPath = FontPath();
