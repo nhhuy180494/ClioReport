@@ -538,7 +538,7 @@ internal sealed class ReportRunner
             var lineHeight = 0.0;
             if (kind == ElementKind.Text && e.Wrap && e.Rotate == 0 && _measurer is not null)
             {
-                var style = new TextStyle(e.Bold, e.Italic, e.FontSize);
+                var style = new TextStyle(e.Bold, e.Italic, e.FontSize, e.FontFamily);
                 var lines = TextWrapper.Wrap(text, e.Width - 2 * e.Padding, _measurer, style);
                 text = string.Join("\n", lines);
                 lineHeight = _measurer.GetLineHeight(style);
@@ -561,7 +561,7 @@ internal sealed class ReportRunner
 
         void AddRow(string[] texts, double minHeight, bool bold, string? fill)
         {
-            var style = new TextStyle(bold, e.Italic, e.FontSize);
+            var style = new TextStyle(bold, e.Italic, e.FontSize, e.FontFamily);
             var lineHeight = wrapOn ? _measurer!.GetLineHeight(style) : 0;
             var cells = new string[columns.Count];
             var rowH = minHeight;
@@ -583,7 +583,7 @@ internal sealed class ReportRunner
                 var cell = new ElementDefinition
                 {
                     Type = "text", X = x, Y = y, Width = widths[i], Height = rowH, Align = columns[i].Align, VAlign = e.VAlign,
-                    Bold = bold, Italic = e.Italic, FontSize = e.FontSize, Color = e.Color, Fill = fill, Border = e.Border,
+                    Bold = bold, Italic = e.Italic, FontSize = e.FontSize, FontFamily = e.FontFamily, Color = e.Color, Fill = fill, Border = e.Border,
                     Thickness = e.Thickness, Padding = e.Padding
                 };
                 items.Add(new PreparedElement(cell, ElementKind.Text, cells[i], rowH, lineHeight, null));
@@ -675,7 +675,7 @@ internal sealed class ReportRunner
             var e = item.Def;
             page.Add(new RenderedElement(
                 _def.Page.Margin + left + e.X, top + e.Y, e.Width, item.Height, item.Text, e.Align, item.Kind,
-                e.Thickness, item.LineHeight, item.Image, new TextStyle(e.Bold, e.Italic, e.FontSize),
+                e.Thickness, item.LineHeight, item.Image, new TextStyle(e.Bold, e.Italic, e.FontSize, e.FontFamily),
                 e.Color, e.Fill, e.Border, e.Padding, e.VAlign, e.Underline, e.Rotate));
         }
     }

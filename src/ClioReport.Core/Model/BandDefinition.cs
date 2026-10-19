@@ -88,6 +88,12 @@ public sealed class ElementDefinition
     /// <summary>Font size in points; 0 uses the renderer's default size.</summary>
     public double FontSize { get; set; }
 
+    /// <summary>
+    /// Font family name, as registered with the renderer (e.g. <c>PdfRenderOptions.Fonts</c>). Null, or a name the renderer
+    /// does not know, uses the default font.
+    /// </summary>
+    public string? FontFamily { get; set; }
+
     /// <summary>Text, line and outline colour as "#RGB" or "#RRGGBB". Default black.</summary>
     public string? Color { get; set; }
 

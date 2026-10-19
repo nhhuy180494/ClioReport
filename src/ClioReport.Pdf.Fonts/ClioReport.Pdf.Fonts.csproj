@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Liberation Sans, Serif and Mono plus Nanum Gothic for Korean (SIL OFL 1.1), embedded for ClioReport.Pdf, so PDFs render the same on Windows, Linux and Docker without installing fonts. Call options.UseBundledFonts().</Description>
+    <PackageTags>$(PackageTags);fonts</PackageTags>
+    <PackageLicenseExpression>MIT AND OFL-1.1</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="FONTS-LICENSE.txt" Pack="true" PackagePath="\" />
+    <None Include="FONTS-LICENSE-Nanum.txt" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Fonts\*.ttf" LogicalName="ClioReport.Pdf.Fonts.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ClioReport.Pdf\ClioReport.Pdf.csproj" />
+  </ItemGroup>
+</Project>

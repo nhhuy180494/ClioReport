@@ -16,6 +16,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoodsReceipt", "samples\Goo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClioReport.Designer", "src\ClioReport.Designer\ClioReport.Designer.csproj", "{3B1D5A10-6C2E-4F11-9A01-000000000007}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClioReport.Pdf.Fonts", "src\ClioReport.Pdf.Fonts\ClioReport.Pdf.Fonts.csproj", "{3B1D5A10-6C2E-4F11-9A01-000000000008}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -50,6 +52,10 @@ Global
 		{3B1D5A10-6C2E-4F11-9A01-000000000005}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3B1D5A10-6C2E-4F11-9A01-000000000005}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3B1D5A10-6C2E-4F11-9A01-000000000005}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B1D5A10-6C2E-4F11-9A01-000000000008}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B1D5A10-6C2E-4F11-9A01-000000000008}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B1D5A10-6C2E-4F11-9A01-000000000008}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B1D5A10-6C2E-4F11-9A01-000000000008}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

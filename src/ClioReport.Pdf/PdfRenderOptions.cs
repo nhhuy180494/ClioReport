@@ -32,9 +32,33 @@ public sealed class PdfRenderOptions
     /// <summary>Optional bold variant of <see cref="FallbackFontFilePath"/>. When null, bold is simulated.</summary>
     public string? FallbackBoldFontFilePath { get; set; }
 
+    /// <summary>Fallback font from any <see cref="FontSource"/> (e.g. in memory). Takes precedence over <see cref="FallbackFontFilePath"/>.</summary>
+    public FontSource? FallbackFont { get; set; }
+
+    /// <summary>Bold variant of <see cref="FallbackFont"/>. Takes precedence over <see cref="FallbackBoldFontFilePath"/>.</summary>
+    public FontSource? FallbackBoldFont { get; set; }
+
+    /// <summary>
+    /// Extra font families an element can pick with its <c>fontFamily</c> (name -> TrueType files). Names are
+    /// case-insensitive. An element without <c>fontFamily</c>, or with a name not listed here, uses
+    /// <see cref="FontFilePath"/>. Characters a family lacks still fall back to <see cref="FallbackFontFilePath"/>.
+    /// </summary>
+    public Dictionary<string, PdfFontFiles> Fonts { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Folder that image elements may load files from when their value is a path (resolved against this folder;
     /// paths escaping it are rejected). Null disables path loading: supply images as byte[] instead.
     /// </summary>
     public string? ImageRoot { get; set; }
+}
+
+/// <summary>The fonts of one family. Only <see cref="Regular"/> is required; a missing style is simulated.</summary>
+public sealed class PdfFontFiles
+{
+    public PdfFontFiles(FontSource regular) => Regular = regular ?? throw new ArgumentNullException(nameof(regular));
+
+    public FontSource Regular { get; }
+    public FontSource? Bold { get; init; }
+    public FontSource? Italic { get; init; }
+    public FontSource? BoldItalic { get; init; }
 }

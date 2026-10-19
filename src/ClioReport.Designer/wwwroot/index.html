@@ -75,6 +75,15 @@ h4:first-child { margin-top: 0; }
 .band .vh::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 28px; height: 3px; margin-left: -14px; border-radius: 3px;
   background: var(--bc); opacity: 0; transition: opacity .12s; }
 .band:hover .vh::after, .band.sel .vh::after { opacity: .7; }
+.sgl { position: absolute; background: #ff2e93; pointer-events: none; z-index: 30; }
+.sgl.v { width: 1px; top: 0; bottom: 0; margin-left: -.5px; } .sgl.h { height: 1px; left: 0; right: 0; margin-top: -.5px; }
+.sgg { position: absolute; background: #ff2e93; pointer-events: none; z-index: 30; }
+.sgg.x { height: 1px; } .sgg.y { width: 1px; }
+.sgg.x::before, .sgg.x::after { content: ''; position: absolute; top: -3px; width: 1px; height: 7px; background: #ff2e93; }
+.sgg.x::before { left: 0; } .sgg.x::after { right: 0; }
+.sgg.y::before, .sgg.y::after { content: ''; position: absolute; left: -3px; height: 1px; width: 7px; background: #ff2e93; }
+.sgg.y::before { top: 0; } .sgg.y::after { bottom: 0; }
+.sgt { position: absolute; z-index: 31; pointer-events: none; font-size: 10px; line-height: 14px; padding: 0 4px; border-radius: 3px; background: #ff2e93; color: #fff; transform: translate(-50%, -50%); white-space: nowrap; }
 .el { position: absolute; overflow: hidden; cursor: move; user-select: none; white-space: pre; display: flex; }
 .el:hover { outline: 1px solid var(--accent); }
 .el.sel { outline: 2px solid var(--accent); z-index: 4; overflow: visible; }
@@ -285,7 +294,7 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     </div>
     <div id="props"></div>
   </div>
-  <div id="status"><span id="statSel"></span><span class="sp"></span><span>Drag to move · arrows nudge · Alt = no snap · Ctrl+Z undo · Ctrl+D duplicate</span></div>
+  <div id="status"><span id="statSel"></span><span class="sp"></span><span>Drag to move (pink guides align and space) · arrows nudge · Alt = no snap · Ctrl+Z undo · Ctrl+D duplicate</span></div>
 </div>
 <div id="bandMenu" hidden></div>
 <dialog id="jsonDlg">
@@ -299,6 +308,7 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
 <dialog id="pvDlg">
   <div class="pvhead">
     <b>PDF preview</b><span id="pvData" class="hint"></span><span class="sp"></span>
+    <input id="pvRoot" type="text" placeholder="Image folder (for image paths)" title="Folder that image elements load file paths from" style="width:220px">
     <button id="pvPick" class="ghost" title="Load a JSON file with sample values and rows">Sample data…</button>
     <button id="pvClear" class="ghost" hidden>Clear data</button>
     <button id="pvRefresh" class="ghost">Refresh</button>
@@ -738,6 +748,7 @@ function renderCanvas() {
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
     };
     b.elements.forEach((e, ei) => body.append(renderElement(b, bi, e, [ei])));
+    if (guides && guides.bi === bi) drawGuides(body, guides);
     const vh = document.createElement('div'); vh.className = 'vh'; vh.title = 'Drag to change band height';
     vh.onpointerdown = ev => startBandResize(ev, bi);
     body.append(vh);
@@ -760,6 +771,7 @@ function renderElement(b, bi, e, path) {
     const t = document.createElement('div'); t.className = 'txt';
     const fs = (e.fontSize || 10) * MM_PER_PT * zoom;
     t.style.fontSize = fs + 'px'; t.style.lineHeight = '1.15';
+    if (e.fontFamily) t.style.fontFamily = `"${e.fontFamily}", sans-serif`;
     if (e.bold) t.style.fontWeight = '700'; if (e.italic) t.style.fontStyle = 'italic';
     if (e.underline) t.style.textDecoration = 'underline';
     t.style.textAlign = e.align || 'left';
@@ -815,6 +827,7 @@ function renderTablePreview(el, e) {
       const cell = document.createElement('div'); cell.className = 'cell' + (expr ? ' expr' : '');
       cell.style.cssText += `left:${x * zoom}px;top:${y * zoom}px;width:${widths[i] * zoom}px;height:${h * zoom}px;`;
       cell.style.fontSize = (e.fontSize || 10) * MM_PER_PT * zoom + 'px';
+      if (e.fontFamily) cell.style.fontFamily = `"${e.fontFamily}", sans-serif`;
       cell.style.fontWeight = bold ? '700' : (e.bold ? '700' : '400');
       cell.style.padding = `0 ${(e.padding || 0) * zoom}px`;
       cell.style.justifyContent = c.align === 'right' ? 'flex-end' : c.align === 'center' ? 'center' : 'flex-start';
@@ -844,11 +857,65 @@ function addHandles(el, bi, path, type) {
 }
 
 // ---------------------------------------------------------------- pointer interactions
+// Smart guides: while dragging, elements snap to the edges/centres of their neighbours and the band, and to equal gaps
+// between neighbours; pink lines and gap labels show why. Alt turns it off, as for the grid snap.
+let guides = null;   // { bi, v: [x...], h: [y...], gaps: [{ ax, from, to, at }] }, drawn by renderCanvas
+const SG_PX = 6;
+function sgTargets(bi, exclude) {
+  const b = def.bands[bi], W = bandWidth(b), xs = [0, W / 2, W], ys = [0, b.height / 2, b.height], others = [];
+  b.elements.forEach((e, i) => {
+    if (exclude.some(p => p.length === 1 && p[0] === i)) return;
+    xs.push(e.x, e.x + e.width / 2, e.x + e.width); ys.push(e.y, e.y + e.height / 2, e.y + e.height); others.push(e);
+  });
+  return { xs, ys, others };
+}
+function sgNearest(vals, lines, tol) {
+  let best = null;
+  for (const v of vals) for (const l of lines) { const d = l - v; if (Math.abs(d) <= tol && (!best || Math.abs(d) < Math.abs(best.d) - 1e-9)) best = { d, line: l }; }
+  return best;
+}
+// Equal spacing along one axis against the neighbours that share the row (x) or column (y): centred between two
+// neighbours, or the same gap that two other neighbours already have.
+function sgSpace(others, mv, ax, tol) {
+  const A = ax === 'x' ? ['x', 'width', 'y', 'height'] : ['y', 'height', 'x', 'width'];
+  const pos = mv[A[0]], size = mv[A[1]], c1 = mv[A[2]], c2 = mv[A[2]] + mv[A[3]], mid = (c1 + c2) / 2;
+  const row = others.map(o => ({ a1: o[A[0]], a2: o[A[0]] + o[A[1]], c1: o[A[2]], c2: o[A[2]] + o[A[3]] }))
+    .filter(o => o.c1 < c2 && o.c2 > c1).sort((p, q) => p.a1 - q.a1);
+  const L = row.filter(o => o.a2 <= pos + 0.01).reduce((p, o) => !p || o.a2 > p.a2 ? o : p, null);
+  const R = row.filter(o => o.a1 >= pos + size - 0.01).reduce((p, o) => !p || o.a1 < p.a1 ? o : p, null);
+  const cands = [];
+  if (L && R && R.a1 - L.a2 > size) {
+    const gap = (R.a1 - L.a2 - size) / 2;
+    cands.push({ p: L.a2 + gap, gaps: [[L.a2, L.a2 + gap, mid], [L.a2 + gap + size, R.a1, mid]] });
+  }
+  for (let i = 0; i + 1 < row.length; i++) {
+    const g = row[i + 1].a1 - row[i].a2; if (g <= 0.01) continue;
+    const at = (row[i].c1 + row[i].c2) / 2;
+    if (L) cands.push({ p: L.a2 + g, gaps: [[row[i].a2, row[i + 1].a1, at], [L.a2, L.a2 + g, mid]] });
+    if (R) cands.push({ p: R.a1 - g - size, gaps: [[row[i].a2, row[i + 1].a1, at], [R.a1 - g, R.a1, mid]] });
+  }
+  let best = null;
+  for (const c of cands) { const d = c.p - pos; if (Math.abs(d) <= tol && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, gaps: c.gaps.map(([from, to, at]) => ({ ax, from, to, at })) }; }
+  return best;
+}
+function drawGuides(body, g) {
+  const add = (cls, css, text) => {
+    const d = document.createElement('div'); d.className = cls; Object.assign(d.style, css); body.append(d);
+    if (text) { const t = document.createElement('div'); t.className = 'sgt'; t.textContent = text; body.append(t); return t; }
+  };
+  for (const x of g.v) add('sgl v', { left: x * zoom + 'px' });
+  for (const y of g.h) add('sgl h', { top: y * zoom + 'px' });
+  for (const k of g.gaps) {
+    const mm = round(k.to - k.from), text = (Math.round(mm * 10) / 10) + '';
+    if (k.ax === 'x') { const t = add('sgg x', { left: k.from * zoom + 'px', width: (k.to - k.from) * zoom + 'px', top: k.at * zoom + 'px' }, text); t.style.left = (k.from + k.to) / 2 * zoom + 'px'; t.style.top = k.at * zoom + 'px'; }
+    else { const t = add('sgg y', { top: k.from * zoom + 'px', height: (k.to - k.from) * zoom + 'px', left: k.at * zoom + 'px' }, text); t.style.top = (k.from + k.to) / 2 * zoom + 'px'; t.style.left = k.at * zoom + 'px'; }
+  }
+}
 function drag(ev, onMove) {
   ev.preventDefault(); ev.stopPropagation();
   const sx = ev.clientX, sy = ev.clientY;
   const move = m => onMove((m.clientX - sx) / zoom, (m.clientY - sy) / zoom, m);
-  const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); commit(); renderProps(); };
+  const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); const had = guides; guides = null; if (had) renderCanvas(); commit(); renderProps(); };
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
 }
 function startMove(ev, bi, path) {
@@ -857,21 +924,47 @@ function startMove(ev, bi, path) {
   if (!inMulti(bi, path)) select({ kind: 'element', b: bi, path });
   const items = selList().map(p => { const e = elAt(bi, p); return { e, x: e.x, y: e.y }; });
   const minX = Math.min(...items.map(i => i.x)), minY = Math.min(...items.map(i => i.y)), lead = items[0];
+  const top = selList().every(p => p.length === 1), tg = top && snap ? sgTargets(bi, selList()) : null;
+  const bx = minX, by = minY, bw = Math.max(...items.map(i => i.x + i.e.width)) - minX, bh = Math.max(...items.map(i => i.y + i.e.height)) - minY;
   drag(ev, (dx, dy, m) => {
     const f = m.altKey ? round : snapv;
-    const ddx = Math.max(f(lead.x + dx) - lead.x, -minX), ddy = Math.max(f(lead.y + dy) - lead.y, -minY);
+    let ddx = Math.max(f(lead.x + dx) - lead.x, -minX), ddy = Math.max(f(lead.y + dy) - lead.y, -minY);
+    guides = null;
+    if (tg && !m.altKey) {
+      const tol = SG_PX / zoom, g = { bi, v: [], h: [], gaps: [] };
+      let nx = bx + ddx, ny = by + ddy;
+      const ax = sgNearest([nx, nx + bw / 2, nx + bw], tg.xs, tol); if (ax) nx += ax.d;
+      const ay = sgNearest([ny, ny + bh / 2, ny + bh], tg.ys, tol); if (ay) ny += ay.d;
+      const sx = ax ? null : sgSpace(tg.others, { x: nx, y: ny, width: bw, height: bh }, 'x', tol); if (sx) { nx += sx.d; g.gaps.push(...sx.gaps); }
+      const sy = ay ? null : sgSpace(tg.others, { x: nx, y: ny, width: bw, height: bh }, 'y', tol); if (sy) { ny += sy.d; g.gaps.push(...sy.gaps); }
+      nx = Math.max(nx, 0); ny = Math.max(ny, 0);
+      for (const v of [nx, nx + bw / 2, nx + bw]) for (const l of tg.xs) if (Math.abs(l - v) < 0.01 && !g.v.includes(l)) g.v.push(l);
+      for (const v of [ny, ny + bh / 2, ny + bh]) for (const l of tg.ys) if (Math.abs(l - v) < 0.01 && !g.h.includes(l)) g.h.push(l);
+      ddx = nx - bx; ddy = ny - by;
+      if (g.v.length || g.h.length || g.gaps.length) guides = g;
+    }
     for (const i of items) { i.e.x = round(i.x + ddx); i.e.y = round(i.y + ddy); }
     renderCanvas();
   });
 }
 function startResize(ev, bi, path, dir) {
   const e = elAt(bi, path), o = { ...e };
+  const tg = path.length === 1 && snap ? sgTargets(bi, [path]) : null;
   drag(ev, (dx, dy, m) => {
     const s = m.altKey ? round : snapv;
     if (dir.includes('e')) e.width = Math.max(0.5, s(o.width + dx));
     if (dir.includes('s')) e.height = Math.max(0, s(o.height + dy));
     if (dir.includes('w')) { const nx = Math.min(s(o.x + dx), o.x + o.width - 0.5); e.x = Math.max(0, nx); e.width = round(o.x + o.width - e.x); }
     if (dir.includes('n')) { const ny = Math.min(s(o.y + dy), o.y + o.height); e.y = Math.max(0, ny); e.height = round(o.y + o.height - e.y); }
+    guides = null;
+    if (tg && !m.altKey) {
+      const tol = SG_PX / zoom, g = { bi, v: [], h: [], gaps: [] };
+      if (dir.includes('e')) { const a = sgNearest([e.x + e.width], tg.xs, tol); if (a && a.line - e.x >= 0.5) { e.width = round(a.line - e.x); g.v.push(a.line); } }
+      if (dir.includes('w')) { const a = sgNearest([e.x], tg.xs, tol), r = o.x + o.width; if (a && r - a.line >= 0.5 && a.line >= 0) { e.x = round(a.line); e.width = round(r - e.x); g.v.push(a.line); } }
+      if (dir.includes('s')) { const a = sgNearest([e.y + e.height], tg.ys, tol); if (a && a.line - e.y >= 0) { e.height = round(a.line - e.y); g.h.push(a.line); } }
+      if (dir.includes('n')) { const a = sgNearest([e.y], tg.ys, tol), r = o.y + o.height; if (a && r - a.line >= 0 && a.line >= 0) { e.y = round(a.line); e.height = round(r - e.y); g.h.push(a.line); } }
+      if (g.v.length || g.h.length) guides = g;
+    }
     renderCanvas();
   });
 }
@@ -1106,6 +1199,39 @@ function field(parent, label, kind, obj, key, opts = {}) {
   }
   row.append(input); parent.append(row); return input;
 }
+let FONTS = [];
+if (location.protocol !== 'file:') fetch('api/fonts').then(r => r.ok ? r.json() : []).then(l => { FONTS = l; renderProps(); }).catch(() => { });
+function fontField(parent, obj) {
+  const names = [...FONTS]; const cur = obj.fontFamily;
+  if (cur && !names.some(n => n.toLowerCase() === String(cur).toLowerCase())) names.push(cur);   // keep a name this host does not know
+  if (!names.length && !cur) return;                                                              // no host: nothing to choose from
+  const row = document.createElement('div'); row.className = 'row';
+  row.append(Object.assign(document.createElement('label'), { textContent: 'Font' }));
+  const sel = document.createElement('select');
+  sel.append(Object.assign(document.createElement('option'), { value: '', textContent: '(default)' }));
+  for (const n of names) sel.append(Object.assign(document.createElement('option'), { value: n, textContent: n }));
+  sel.value = cur || '';
+  sel.onchange = () => { obj.fontFamily = sel.value || undefined; commit(); renderCanvas(); };
+  row.append(sel); parent.append(row);
+}
+// One box for an image: a file path (stored as a quoted expression, with / so no escaping is needed) or a field/expression.
+const literalOf = x => { const m = /^'((?:[^'\\]|\\.)*)'$/.exec((x || '').trim()); return m ? m[1] : null; };
+const looksLikePath = v => /[\\/]/.test(v) || /\.(png|jpe?g|gif|bmp|tiff?|webp)$/i.test(v);
+function imageSourceField(parent, e) {
+  const row = document.createElement('div'); row.className = 'row';
+  row.append(Object.assign(document.createElement('label'), { textContent: 'Image' }));
+  const input = document.createElement('input'); input.type = 'text';
+  input.placeholder = 'path, e.g. logo.png, or a field name';
+  const lit = literalOf(e.expression); input.value = lit !== null ? lit : (e.expression || '');
+  input.onchange = () => {
+    const v = input.value.trim();
+    if (!v) e.expression = undefined;
+    else if (looksLikePath(v)) e.expression = "'" + v.replace(/\\/g, '/').replace(/'/g, "\\'") + "'";
+    else e.expression = v;
+    commit(); renderCanvas();
+  };
+  row.append(input); parent.append(row);
+}
 function h4(parent, text) { const h = document.createElement('h4'); h.textContent = text; parent.append(h); }
 function title(parent, text, badge, color) {
   const d = document.createElement('div'); d.className = 'ptitle';
@@ -1202,10 +1328,11 @@ function multiProps(p) {
       set: (t, k, v) => { for (const e of targets) if (keys.includes(k)) e[k] = v; return true; }
     });
   };
-  const TXT = ['fontSize', 'bold', 'italic', 'underline', 'align', 'vAlign', 'rotate', 'padding', 'wrap', 'fitBand', 'color', 'fill', 'border', 'thickness'];
+  const TXT = ['fontFamily', 'fontSize', 'bold', 'italic', 'underline', 'align', 'vAlign', 'rotate', 'padding', 'wrap', 'fitBand', 'color', 'fill', 'border', 'thickness'];
   const g = group(['text'], TXT);
   if (g) {
     h4(p, 'Text style (' + list.filter(e => typeOf(e) === 'text').length + ' text)');
+    fontField(p, g);
     field(p, 'Font size', 'number', g, 'fontSize', { step: 1 });
     toggles(p, 'Emphasis', g, [{ key: 'bold', html: '<b>B</b>', title: 'Bold' }, { key: 'italic', html: '<i>I</i>', title: 'Italic' }, { key: 'underline', html: '<u>U</u>', title: 'Underline' }]);
     seg(p, 'Align', g, 'align', [{ v: 'left', html: ico('alignL') }, { v: 'center', html: ico('alignC') }, { v: 'right', html: ico('alignR') }], 'left');
@@ -1246,6 +1373,7 @@ function elementProps(p, e) {
     field(p, 'Text', 'area', e, 'text');
     field(p, 'Expression', 'area', e, 'expression', { placeholder: "e.g. Format(qty, 'N0')" });
     h4(p, 'Style');
+    fontField(p, e);
     field(p, 'Font size', 'number', e, 'fontSize', { step: 1 });
     toggles(p, 'Emphasis', e, [{ key: 'bold', html: '<b>B</b>', title: 'Bold' }, { key: 'italic', html: '<i>I</i>', title: 'Italic' },
       { key: 'underline', html: '<u>U</u>', title: 'Underline' }]);
@@ -1264,6 +1392,11 @@ function elementProps(p, e) {
     colourField(p, 'Colour', e, 'color');
     field(p, 'Thickness', 'number', e, 'thickness', { step: 0.1, default: 0.2 });
     if (t === 'rect') colourField(p, 'Fill', e, 'fill');
+  } else if (t === 'image') {
+    h4(p, 'Content');
+    imageSourceField(p, e);
+    seg(p, 'Align', e, 'align', [{ v: 'left', html: ico('alignL') }, { v: 'center', html: ico('alignC') }, { v: 'right', html: ico('alignR') }], 'left');
+    p.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: 'Type a file path (D:\\images\\logo.png or logo.png) or a field name (logo). In an app the file must be inside PdfRenderOptions.ImageRoot; in Preview the drive or Image folder is used.' }));
   } else {
     h4(p, 'Content');
     field(p, 'Expression', 'area', e, 'expression');
@@ -1323,6 +1456,7 @@ function tableProps(p, e) {
   colourField(p, 'Header fill', e, 'fill'); colourField(p, 'Zebra fill', e, 'altFill');
   field(p, 'Border', 'check', e, 'border'); field(p, 'Thickness', 'number', e, 'thickness', { step: 0.1, default: 0.2 });
   field(p, 'Padding', 'number', e, 'padding');
+  fontField(p, e);
   field(p, 'Font size', 'number', e, 'fontSize', { step: 1 });
   toggles(p, 'Emphasis', e, [{ key: 'bold', html: '<b>B</b>', title: 'Bold body' }, { key: 'italic', html: '<i>I</i>', title: 'Italic' }]);
   colourField(p, 'Text colour', e, 'color');
@@ -1482,6 +1616,12 @@ function pvShow(text, isErr) {
   const m = $('pvMsg'); m.hidden = false; m.textContent = text; m.className = isErr ? 'err' : '';
 }
 function pvLabel() { $('pvData').textContent = sampleData ? 'Data: ' + sampleName : 'No sample data: fields are blank'; $('pvClear').hidden = !sampleData; }
+// With no Image folder typed, an absolute image path ('D:/pics/a.png' or '/srv/a.png') makes its drive/root the folder.
+function autoImageRoot() {
+  const walk = els => { for (const e of els || []) { const m = /^([A-Za-z]:\/|\/)/.exec(literalOf(e.expression) || ''); if (e.type === 'image' && m) return m[1]; const r = walk(e.items); if (r) return r; } return null; };
+  for (const b of def.bands || []) { const r = walk(b.elements); if (r) return r; }
+  return null;
+}
 async function preview() {
   const dlg = $('pvDlg'); if (!dlg.open) dlg.showModal();
   pvLabel();
@@ -1491,7 +1631,7 @@ async function preview() {
   pvShow('Rendering…', false);
   try {
     const res = await fetch('api/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ report: JSON.parse(serialize()), data: sampleData || undefined }) });
+      body: JSON.stringify({ report: JSON.parse(serialize()), data: sampleData || undefined, imageRoot: $('pvRoot').value.trim() || autoImageRoot() || undefined }) });
     if (!res.ok) { pvShow(await res.text(), true); return; }
     const url = URL.createObjectURL(await res.blob());
     if (pvUrl) URL.revokeObjectURL(pvUrl); pvUrl = url;
@@ -1521,6 +1661,8 @@ $('bPreview').onclick = preview;
 $('pvRefresh').onclick = preview;
 $('pvClose').onclick = () => $('pvDlg').close();
 $('pvPick').onclick = () => $('pvFile').click();
+try { $('pvRoot').value = localStorage.getItem('clio.imageRoot') || ''; } catch { }
+$('pvRoot').onchange = () => { try { localStorage.setItem('clio.imageRoot', $('pvRoot').value.trim()); } catch { } preview(); };
 $('pvClear').onclick = () => { sampleData = null; sampleName = ''; try { localStorage.removeItem('clio.sampleData'); localStorage.removeItem('clio.sampleName'); } catch { } preview(); };
 $('pvFile').onchange = async ev => {
   const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;

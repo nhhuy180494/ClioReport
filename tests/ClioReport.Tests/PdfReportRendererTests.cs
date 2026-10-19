@@ -163,6 +163,34 @@ public class PdfReportRendererTests
     }
 
     [Fact]
+    public void MissingImage_DrawsPlaceholder_InsteadOfFailing()
+    {
+        var fontPath = FontPath();
+        if (fontPath is null) return;
+
+        var root = Path.Combine(Path.GetTempPath(), "clioreport-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var options = new PdfRenderOptions { FontFilePath = fontPath, ImageRoot = root };
+            var plain = RenderPdf("""{ "type": "rect", "width": 1, "height": 1 }""", new { }, options);
+
+            var notFound = RenderPdf("""{ "type": "image", "width": 30, "height": 12, "text": "nope.png" }""", new { }, options);
+            var noValue = RenderPdf("""{ "type": "image", "width": 30, "height": 12, "expression": "logo" }""", new { Logo = (string?)null }, options);
+            var noExpression = RenderPdf("""{ "type": "image", "width": 30, "height": 12 }""", new { }, options);
+
+            // The placeholder has text, so a font is embedded and the file is bigger than one with nothing drawn.
+            Assert.True(notFound.Length > plain.Length);
+            Assert.True(noValue.Length > plain.Length);
+            Assert.True(noExpression.Length > plain.Length);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public void BoldItalicAndFontSize_AreRendered()
     {
         var fontPath = FontPath();

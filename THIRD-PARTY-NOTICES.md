@@ -22,3 +22,14 @@ subject to the following conditions:
   liability, whether in an action of contract, tort or otherwise, arising from,
   out of or in connection with the Software or the use or other dealings in the
   Software.
+
+## Liberation Fonts (package ClioReport.Pdf.Fonts)
+
+`src/ClioReport.Pdf.Fonts/Fonts` holds Liberation Sans, Serif and Mono, unmodified, embedded in the `ClioReport.Pdf.Fonts` assembly.
+
+Digitized data copyright (c) 2010 Google Corporation with Reserved Font Arimo, Tinos and Cousine.
+Copyright (c) 2012 Red Hat, Inc. with Reserved Font Name Liberation.
+
+Licensed under the SIL Open Font License, Version 1.1; the full text is in `src/ClioReport.Pdf.Fonts/FONTS-LICENSE.txt` and ships inside the package.
+
+The same folder holds Nanum Gothic (regular and bold, unmodified) for Korean text. Copyright (c) 2010, NAVER Corporation, with Reserved Font Name Nanum; SIL Open Font License 1.1, full text in `src/ClioReport.Pdf.Fonts/FONTS-LICENSE-Nanum.txt`.

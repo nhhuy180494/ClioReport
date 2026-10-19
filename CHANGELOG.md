@@ -2,7 +2,12 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.6 (2026-10-19)
+
 - Designer: *Table wizard* (wand button in the left rail, or *Table wizard…* in a table's properties). Pick a collection and its fields from the loaded sample data (or add columns by hand), set header, alignment, width and format per column, then insert a new table or apply the result to the selected one.
+- Per-element font: text and table elements take an optional `fontFamily`. Register families with `PdfRenderOptions.Fonts` (name -> regular/bold/italic/bold-italic TrueType files); an element without `fontFamily`, or with an unknown name, uses `FontFilePath`. `TextStyle` gained a `FontFamily` member, so measuring and wrapping use the same font. Designer: *Font* dropdown (the host offers the families found in the OS fonts folder) and an *Image folder* box in the Preview window, so image elements whose value is a file path load from that folder (`PdfRenderOptions.ImageRoot`).
+- Designer: smart guides while dragging or resizing an element. It snaps to the edges and centres of neighbouring elements and the band (pink lines), and to equal gaps between neighbours (pink gap labels in mm). Alt turns it off. An image element has one *Image* box that takes a file path or a field name, and an image with no picture is drawn as a dashed "No image" box instead of failing.
+- New package `ClioReport.Pdf.Fonts`: Liberation Sans, Serif and Mono plus Nanum Gothic for Hangul (SIL OFL 1.1, about 14 MB) embedded in the assembly. `new PdfRenderOptions().UseBundledFonts()` registers them as "Arial", "Times New Roman" and "Courier New" (and as "Liberation ..."), so PDFs look the same on Windows, Linux and Docker without installing fonts. Fonts can now also be supplied from memory (`FontSource.FromBytes`); `PdfRenderOptions.FontFamily` picks the default font from `Fonts` when `FontFilePath` is not set. `UseBundledFonts()` also sets Nanum Gothic as the fallback for Korean text unless you set `FallbackFont`/`FallbackFontFilePath`; `PdfRenderOptions.FallbackFont` and `FallbackBoldFont` accept any `FontSource`.
 
 ## 0.1.0-alpha.5 (2026-10-18)
 

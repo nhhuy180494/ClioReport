@@ -28,7 +28,10 @@ internal sealed class ImageCache : IDisposable
 
         if (element.Text.Length == 0) return null;
 
-        var path = ResolvePath(element.Text);
+        // A file that is not there is "no image" (the renderer draws a placeholder); a path that is not allowed still throws.
+        string path;
+        try { path = ResolvePath(element.Text); }
+        catch (FileNotFoundException) { return null; }
         if (_byPath.TryGetValue(path, out var known)) return known;
 
         var fromFile = XImage.FromFile(path);

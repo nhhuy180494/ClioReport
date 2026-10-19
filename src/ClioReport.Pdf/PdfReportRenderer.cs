@@ -54,7 +54,7 @@ public static class PdfReportRenderer
                         DrawQrCode(gfx, e, rect);
                         break;
                     case ElementKind.Image:
-                        DrawImage(gfx, e, rect, images);
+                        DrawImage(gfx, e, rect, images, fonts);
                         break;
                     default:
                     {
@@ -193,10 +193,14 @@ public static class PdfReportRenderer
         }
     }
 
-    private static void DrawImage(XGraphics gfx, RenderedElement e, XRect rect, ImageCache images)
+    private static void DrawImage(XGraphics gfx, RenderedElement e, XRect rect, ImageCache images, FontCache fonts)
     {
         var image = images.Get(e);
-        if (image is null || image.PointWidth <= 0 || image.PointHeight <= 0) return;
+        if (image is null || image.PointWidth <= 0 || image.PointHeight <= 0)
+        {
+            DrawNoImage(gfx, rect, fonts);
+            return;
+        }
 
         var scale = Math.Min(rect.Width / image.PointWidth, rect.Height / image.PointHeight);
         var width = image.PointWidth * scale;
@@ -208,6 +212,15 @@ public static class PdfReportRenderer
             _ => rect.X
         };
         gfx.DrawImage(image, x, rect.Y, width, height);
+    }
+
+    /// <summary>Placeholder for an image element with no picture (empty value, null field, file not found).</summary>
+    private static void DrawNoImage(XGraphics gfx, XRect rect, FontCache fonts)
+    {
+        var grey = XColor.FromArgb(150, 150, 150);
+        gfx.DrawRectangle(new XPen(grey, 0.5) { DashStyle = XDashStyle.Dash }, rect);
+        var font = fonts.Get(new TextStyle(FontSize: Math.Min(8, Math.Max(4, rect.Height / 3))));
+        gfx.DrawString("No image", font, new XSolidBrush(grey), rect, XStringFormats.Center);
     }
 
     private static XPen PenOf(RenderedElement e) =>
@@ -237,17 +250,37 @@ public static class PdfReportRenderer
         {
             if (GlobalFontSettings.FontResolver is not null) return;
 
-            var path = options.FontFilePath ?? DefaultFontPath();
-            if (path is null || !File.Exists(path))
-                throw new InvalidOperationException(
-                    "No font available. Set PdfRenderOptions.FontFilePath to a .ttf file that covers your text " +
-                    "(e.g. Arial), or assign GlobalFontSettings.FontResolver before rendering.");
+            // Main font: FontFilePath, else the registered family named like FontFamily (e.g. the bundled fonts), else the
+            // system Arial.
+            FontSource? regular = null, bold = null, italic = null, boldItalic = null;
+            if (options.FontFilePath is null && options.Fonts.TryGetValue(options.FontFamily, out var main))
+                (regular, bold, italic, boldItalic) = (main.Regular, main.Bold, main.Italic, main.BoldItalic);
+            else
+            {
+                var path = options.FontFilePath ?? DefaultFontPath();
+                if (path is null || !File.Exists(path))
+                    throw new InvalidOperationException(
+                        "No font available. Set PdfRenderOptions.FontFilePath to a .ttf file that covers your text " +
+                        "(e.g. Arial), register fonts in PdfRenderOptions.Fonts (or use ClioReport.Pdf.Fonts), or assign " +
+                        "GlobalFontSettings.FontResolver before rendering.");
+                regular = path;
+                bold = ExistingOrNull(options.BoldFontFilePath);
+                italic = ExistingOrNull(options.ItalicFontFilePath);
+                boldItalic = ExistingOrNull(options.BoldItalicFontFilePath);
+            }
 
             GlobalFontSettings.FontResolver = new SingleFileFontResolver(
-                path, ExistingOrNull(options.BoldFontFilePath), ExistingOrNull(options.ItalicFontFilePath),
-                ExistingOrNull(options.BoldItalicFontFilePath), ExistingOrNull(options.FallbackFontFilePath),
-                ExistingOrNull(options.FallbackBoldFontFilePath));
+                regular!, bold, italic, boldItalic, options.FallbackFont ?? ExistingOrNull(options.FallbackFontFilePath),
+                options.FallbackBoldFont ?? ExistingOrNull(options.FallbackBoldFontFilePath), CheckedFamilies(options));
         }
+    }
+
+    private static IReadOnlyDictionary<string, PdfFontFiles> CheckedFamilies(PdfRenderOptions options)
+    {
+        foreach (var (name, files) in options.Fonts)
+            foreach (var source in new[] { files.Regular, files.Bold, files.Italic, files.BoldItalic })
+                source?.EnsureExists(name);
+        return options.Fonts;
     }
 
     private static string? ExistingOrNull(string? path)

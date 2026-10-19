@@ -20,6 +20,9 @@ app.UseStaticFiles(new StaticFileOptions
 
 var options = CreateOptions();
 
+// Font families the designer offers per element (the ones found in the OS fonts folder).
+app.MapGet("/api/fonts", () => options.Fonts.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase));
+
 // Body: { "report": <report JSON>, "data": <any JSON object, optional> }. Returns application/pdf, or 400 + text.
 app.MapPost("/api/preview", async (HttpRequest request) =>
 {
@@ -36,14 +39,21 @@ app.MapPost("/api/preview", async (HttpRequest request) =>
             ? new ObjectDataContext((Dictionary<string, object?>)Convert(dataJson)!)
             : new BlankData();
 
-        using var measurer = new PdfTextMeasurer(options);
+        // Image elements whose value is a file path load from this folder (typed in the designer; local host only).
+        var imageRoot = doc.RootElement.TryGetProperty("imageRoot", out var rootJson) && rootJson.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(rootJson.GetString()) ? rootJson.GetString() : null;
+        if (imageRoot is not null && !Directory.Exists(imageRoot))
+            return Results.Text($"Image folder not found: {imageRoot}", statusCode: 400);
+        var renderOptions = CreateOptions(imageRoot);
+
+        using var measurer = new PdfTextMeasurer(renderOptions);
         var report = ReportEngine.Render(definition, data, measurer);
 
         using var ms = new MemoryStream();
-        PdfReportRenderer.Render(report, ms, options);
+        PdfReportRenderer.Render(report, ms, renderOptions);
         return Results.File(ms.ToArray(), "application/pdf");
     }
-    catch (Exception ex) when (ex is ReportException or JsonException)
+    catch (Exception ex) when (ex is ReportException or JsonException or IOException or InvalidOperationException)
     {
         return Results.Text(ex.Message, statusCode: 400);
     }
@@ -93,12 +103,13 @@ static object FromString(string s)
 
 // Same font setup as the samples: Arial (Vietnamese) with Malgun Gothic (Hangul) as fallback, taken from the OS fonts
 // folder when present. Missing files are skipped, so the host still starts on machines without them.
-static PdfRenderOptions CreateOptions()
+static PdfRenderOptions CreateOptions(string? imageRoot = null)
 {
     var fonts = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
-    string? Font(string file) => !string.IsNullOrEmpty(fonts) && File.Exists(Path.Combine(fonts, file)) ? Path.Combine(fonts, file) : null;
-    return new PdfRenderOptions
+    string? Font(string? file) => file is not null && !string.IsNullOrEmpty(fonts) && File.Exists(Path.Combine(fonts, file)) ? Path.Combine(fonts, file) : null;
+    var result = new PdfRenderOptions
     {
+        ImageRoot = imageRoot,
         FontSize = 8,
         FontFilePath = Font("arial.ttf"),
         BoldFontFilePath = Font("arialbd.ttf"),
@@ -107,6 +118,22 @@ static PdfRenderOptions CreateOptions()
         FallbackFontFilePath = Font("malgun.ttf"),
         FallbackBoldFontFilePath = Font("malgunbd.ttf")
     };
+
+    // Other families an element can pick. Only families whose regular file exists are offered.
+    void Family(string name, string regular, string? bold, string? italic, string? boldItalic)
+    {
+        if (Font(regular) is not { } r) return;
+        result.Fonts[name] = new PdfFontFiles(r) { Bold = Font(bold), Italic = Font(italic), BoldItalic = Font(boldItalic) };
+    }
+    Family("Arial", "arial.ttf", "arialbd.ttf", "ariali.ttf", "arialbi.ttf");
+    Family("Times New Roman", "times.ttf", "timesbd.ttf", "timesi.ttf", "timesbi.ttf");
+    Family("Courier New", "cour.ttf", "courbd.ttf", "couri.ttf", "courbi.ttf");
+    Family("Tahoma", "tahoma.ttf", "tahomabd.ttf", null, null);
+    Family("Verdana", "verdana.ttf", "verdanab.ttf", "verdanai.ttf", "verdanaz.ttf");
+    Family("Segoe UI", "segoeui.ttf", "segoeuib.ttf", "segoeuii.ttf", "segoeuiz.ttf");
+    Family("Calibri", "calibri.ttf", "calibrib.ttf", "calibrii.ttf", "calibriz.ttf");
+    Family("Georgia", "georgia.ttf", "georgiab.ttf", "georgiai.ttf", "georgiaz.ttf");
+    return result;
 }
 
 // Preview without sample data: every field is blank, there are no rows.
