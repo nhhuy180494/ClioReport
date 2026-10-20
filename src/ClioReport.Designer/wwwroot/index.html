@@ -85,6 +85,12 @@ body.focus #top, body.focus #status, body.focus #rail, body.focus #outline, body
 body.focus #stage { padding-left: 190px; }
 body.panready #stage, body.panready #stage * { cursor: grab !important; }
 body.panning #stage, body.panning #stage * { cursor: grabbing !important; }
+#helpDlg { width: min(760px, 94vw); max-height: 86vh; overflow: auto; }
+#helpDlg h3 { margin: 0 0 4px; } #helpDlg h4 { margin: 16px 0 6px; font-size: 13px; }
+#helpDlg ol, #helpDlg ul { margin: 0; padding-left: 20px; line-height: 1.55; } #helpDlg p { margin: 4px 0; line-height: 1.5; }
+#helpDlg table { width: 100%; border-collapse: collapse; } #helpDlg td { padding: 3px 8px 3px 0; vertical-align: top; border-bottom: 1px solid var(--line); }
+#helpDlg td:first-child { white-space: nowrap; width: 38%; }
+#helpDlg kbd { font: 11.5px ui-monospace, Consolas, monospace; padding: 1px 5px; border: 1px solid var(--line2); border-radius: 4px; background: var(--accent-soft); }
 .vsplit { position: absolute; top: 0; bottom: 0; width: 7px; cursor: col-resize; z-index: 40; }
 .vsplit::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent; transition: background .12s; }
 .vsplit:hover::after, .vsplit.on::after { background: var(--accent); width: 2px; left: 2.5px; }
@@ -315,6 +321,7 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     <button id="bPanR" class="icon tog" title="Show/hide Properties ( ] )"></button>
     <button id="bFocus" class="icon tog" title="Focus mode: only the canvas ( \ )"></button>
     <label class="chip" title="Snap to 0.5 mm"><input type="checkbox" id="snap" checked> Snap</label>
+    <button id="bHelp" class="icon" title="Help and shortcuts ( F1 )">?</button>
     <button id="bJson" class="ghost"></button>
     <button id="bPreview" class="ghost" title="Preview as PDF (needs the local host)"></button>
     <button id="bSave" class="primary" title="Save (Ctrl+S)"></button>
@@ -332,7 +339,7 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     <div class="vsplit" id="splitL" title="Drag to resize, double-click to reset"></div>
     <div class="vsplit" id="splitR" title="Drag to resize, double-click to reset"></div>
   </div>
-  <div id="status"><span id="statSel"></span><span class="sp"></span><span>Drag to move (pink guides align and space) · arrows nudge · Alt = no snap · Ctrl+wheel zoom · Space+drag pan · [ ] hide panels · \\ focus · Ctrl+Z undo · Ctrl+D duplicate</span></div>
+  <div id="status"><span id="statSel"></span><span class="sp"></span><span>Drag to move (pink guides align and space) · arrows nudge · Alt = no snap · Ctrl+wheel zoom · Space+drag pan · [ ] hide panels · \ focus · Ctrl+Z undo · Ctrl+D duplicate · F1 help</span></div>
 </div>
 <div id="bandMenu" hidden></div>
 <dialog id="jsonDlg">
@@ -376,6 +383,47 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     <label id="tbFitWrap"><input type="checkbox" id="tbFit" checked> Fit to band width</label>
   </div>
   <div class="actions" style="justify-content:flex-end"><button id="tbCancel" class="ghost">Cancel</button><button id="tbOk" class="primary">Insert table</button></div>
+</dialog>
+<dialog id="helpDlg">
+  <h3>Using the designer</h3>
+  <p class="hint">A report is a list of bands (header, detail, footer...). Each band holds elements whose values are expressions. Units are millimetres.</p>
+  <h4>Build a report</h4>
+  <ol>
+    <li>Set the page and the <b>Data source</b> (collection name for the detail rows) under <i>Report</i> in the Properties panel.</li>
+    <li>Add bands with the layers button in the left rail. Use <i>Column header</i> for table titles, <i>Detail</i> for one row of data, <i>Group header/footer</i> for groups.</li>
+    <li>Add elements: click a tool in the rail, or drag it onto a band. Text, image, barcode and QR take an <b>expression</b>, such as <code>Name</code>, <code>Qty * Price</code> or <code>'Total'</code> (quotes = fixed text). The wand makes a table from a collection's fields.</li>
+    <li><b>Preview</b> renders a PDF. <i>Sample data…</i> loads a JSON file (an object with values and arrays of rows) so fields show real values and the Table wizard lists them.</li>
+    <li><b>Save</b> writes a <code>.clio</code> file. <b>JSON</b> shows or edits the raw definition.</li>
+  </ol>
+  <h4>Expressions</h4>
+  <ul>
+    <li>Fields: <code>name</code>, <code>customer.city</code> (case-sensitive). Variables: <code>PageNumber</code>, <code>PageCount</code> and your aggregate names. Text: <code>'abc'</code>. Join with <code>+</code>.</li>
+    <li>Operators: <code>+ - * / %</code>, <code>== != &lt; &lt;= &gt; &gt;=</code>, <code>&amp;&amp; || !</code>, <code>cond ? a : b</code>. Conditions must be true/false (<code>qty &gt; 0</code>, not <code>qty</code>).</li>
+    <li>Functions: <code>Format(x,'N0')</code>, <code>Format(date,'dd/MM/yyyy')</code>, <code>Round(x,2)</code>, <code>Abs</code>, <code>Min</code>, <code>Max</code>, <code>Upper</code>, <code>Lower</code>, <code>Trim</code>, <code>Len</code>, <code>IsNull(a,b)</code>.</li>
+    <li>On the canvas <code>{Name}</code> is an expression (braces are only a marker); text without braces is fixed. After an RDLC import you may see <code>{(Name)}</code>: the parentheses just group and change nothing.</li>
+    <li>Totals: add an <b>Aggregate</b> (sum, count, avg, min, max) under Report, then use its name, e.g. <code>Format(tong,'N0')</code>. Groups nest in list order; join fields for one level: <code>kho + '|' + loai</code>. Details in docs/designer.md.</li>
+    <li>Examples: <code>'Page ' + PageNumber + '/' + PageCount</code>, <code>IsNull(note,'-')</code>, <code>'Total: ' + Format(tong,'N0')</code>. More in docs/designer.md.</li>
+  </ul>
+  <h4>Fonts and images</h4>
+  <ul>
+    <li>Pick a <b>Font</b> per text element or table. The list comes from the fonts the host registered.</li>
+    <li>An image element takes either bytes (a <code>byte[]</code> field) or a file path. Paths are resolved inside the <b>Image folder</b> set in Preview; a missing file prints <i>No image</i>. Forward slashes work everywhere.</li>
+  </ul>
+  <h4>Shortcuts</h4>
+  <table>
+    <tr><td><kbd>Ctrl</kbd>+wheel</td><td>Zoom around the pointer (also pinch)</td></tr>
+    <tr><td><kbd>Space</kbd>+drag, middle button</td><td>Pan the page</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>0</kbd>, <kbd>Ctrl</kbd>+<kbd>+</kbd>/<kbd>-</kbd></td><td>Fit width, zoom in steps</td></tr>
+    <tr><td>Drag, arrows (<kbd>Shift</kbd> = 5 mm)</td><td>Move; pink guides snap to neighbours and equal gaps. Hold <kbd>Alt</kbd> to skip snapping</td></tr>
+    <tr><td><kbd>Shift</kbd> or <kbd>Ctrl</kbd>+click, <kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select several elements</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd>, <kbd>Del</kbd></td><td>Duplicate, delete</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Undo, redo</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save</td></tr>
+    <tr><td><kbd>[</kbd> <kbd>]</kbd> <kbd>\</kbd> <kbd>Esc</kbd></td><td>Hide Structure, hide Properties, focus mode, leave focus / select parent</td></tr>
+    <tr><td><kbd>F1</kbd></td><td>This help</td></tr>
+  </table>
+  <p class="hint" style="margin-top:12px">Full guide: docs/designer.md in the repository.</p>
+  <div class="actions" style="justify-content:flex-end"><button id="helpClose" class="primary">Close</button></div>
 </dialog>
 <div id="toast"></div>
 
@@ -1815,6 +1863,8 @@ $('pvFile').onchange = async ev => {
     preview();
   } catch (e) { toast('Not usable as sample data: ' + e.message); }
 };
+$('bHelp').onclick = () => $('helpDlg').showModal();
+$('helpClose').onclick = () => $('helpDlg').close();
 $('bJson').onclick = () => { $('jsonText').value = serialize(); $('jsonErr').textContent = ''; $('jsonDlg').showModal(); };
 $('jsonClose').onclick = () => $('jsonDlg').close();
 $('jsonCopy').onclick = async () => { try { await navigator.clipboard.writeText($('jsonText').value); toast('Copied'); } catch (_) { $('jsonText').select(); } };
@@ -1830,6 +1880,7 @@ window.addEventListener('keydown', ev => {
   const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
   const mod = ev.ctrlKey || ev.metaKey;
   if (mod && ev.key.toLowerCase() === 's') { ev.preventDefault(); save(); return; }
+  if (ev.key === 'F1') { ev.preventDefault(); const d = $('helpDlg'); if (d.open) d.close(); else d.showModal(); return; }
   if (typing) return;
   if (mod && ev.key.toLowerCase() === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
   else if (mod && (ev.key.toLowerCase() === 'y' || (ev.key.toLowerCase() === 'z' && ev.shiftKey))) { ev.preventDefault(); redo(); }
