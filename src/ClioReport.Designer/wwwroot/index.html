@@ -75,6 +75,36 @@ h4:first-child { margin-top: 0; }
 .band .vh::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 28px; height: 3px; margin-left: -14px; border-radius: 3px;
   background: var(--bc); opacity: 0; transition: opacity .12s; }
 .band:hover .vh::after, .band.sel .vh::after { opacity: .7; }
+/* workspace: resizable / hideable panels, focus mode, compact properties */
+#main { position: relative; }
+body.hideL { --wL: 0px; } body.hideR { --wR: 0px; }
+body.hideL #outline, body.hideR #props { visibility: hidden; padding: 0; border: 0; overflow: hidden; }
+body.focus { --wL: 0px; --wR: 0px; --wRail: 0px; }
+body.focus #app { grid-template-rows: 0 1fr 0; }
+body.focus #top, body.focus #status, body.focus #rail, body.focus #outline, body.focus #props { visibility: hidden; overflow: hidden; padding: 0; border: 0; }
+body.focus #stage { padding-left: 190px; }
+.vsplit { position: absolute; top: 0; bottom: 0; width: 7px; cursor: col-resize; z-index: 40; }
+.vsplit::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent; transition: background .12s; }
+.vsplit:hover::after, .vsplit.on::after { background: var(--accent); width: 2px; left: 2.5px; }
+#splitL { left: calc(var(--wRail, 46px) + var(--wL, 232px) - 3px); } #splitR { right: calc(var(--wR, 304px) - 3px); }
+body.hideL #splitL, body.hideR #splitR, body.focus .vsplit { display: none; }
+.focuspill { position: fixed; top: 10px; right: 14px; z-index: 60; display: none; background: var(--panel); border: 1px solid var(--line2); border-radius: 999px; box-shadow: var(--shadow); padding: 4px 12px; opacity: .55; }
+.focuspill:hover { opacity: 1; }
+body.focus .focuspill { display: inline-flex; }
+button.tog.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+#props { container-type: inline-size; }
+#props h4.collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 5px; }
+#props h4.collapsible::before { content: ''; width: 5px; height: 5px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg); transition: transform .12s; margin: -2px 2px 0 1px; }
+#props h4.collapsible.closed::before { transform: rotate(-45deg); margin-top: 0; }
+#props h4.closed { margin-bottom: 0; }
+@container (min-width: 270px) {
+  .psec { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; }
+  .psec > :not(.row) { grid-column: 1 / -1; }
+  .psec > .row { grid-template-columns: 1fr; gap: 3px; margin-bottom: 8px; min-width: 0; }
+  .psec > .row > label:first-child { font-size: 11px; color: var(--muted); }
+  .psec > .row:has(textarea, .seg, .xywh, .colour, .tbgrid) { grid-column: 1 / -1; grid-template-columns: 86px 1fr; gap: 8px; }
+  .psec > .row:has(textarea, .seg, .xywh, .colour, .tbgrid) > label:first-child { font-size: inherit; color: inherit; }
+}
 .sgl { position: absolute; background: #ff2e93; pointer-events: none; z-index: 30; }
 .sgl.v { width: 1px; top: 0; bottom: 0; margin-left: -.5px; } .sgl.h { height: 1px; left: 0; right: 0; margin-top: -.5px; }
 .sgg { position: absolute; background: #ff2e93; pointer-events: none; z-index: 30; }
@@ -175,7 +205,7 @@ button.primary { background: var(--accent); color: var(--on-accent); }
 #dirty { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
 .chip { padding: 3px 9px; }
 
-#main { grid-template-columns: 46px 232px 1fr 304px; }
+#main { grid-template-columns: var(--wRail, 46px) var(--wL, 232px) 1fr var(--wR, 304px); }
 #rail { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; }
 #rail .rbtn { width: 34px; height: 34px; padding: 0; justify-content: center; position: relative; }
 #rail .rbtn svg.i { width: 18px; height: 18px; }
@@ -279,6 +309,9 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     <span class="sp"></span>
     <div class="doc"><span id="fileName"></span><i id="dirty" title="Unsaved changes" hidden></i></div>
     <span class="sp"></span>
+    <button id="bPanL" class="icon tog" title="Show/hide Structure ( [ )"></button>
+    <button id="bPanR" class="icon tog" title="Show/hide Properties ( ] )"></button>
+    <button id="bFocus" class="icon tog" title="Focus mode: only the canvas ( \ )"></button>
     <label class="chip" title="Snap to 0.5 mm"><input type="checkbox" id="snap" checked> Snap</label>
     <button id="bJson" class="ghost"></button>
     <button id="bPreview" class="ghost" title="Preview as PDF (needs the local host)"></button>
@@ -290,11 +323,14 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     <div id="outline"></div>
     <div id="stagewrap">
       <div id="stage"><div id="page"></div></div>
-      <div class="zoompill"><button id="zOut" class="icon" title="Zoom out"></button><button id="zval"></button><button id="zIn" class="icon" title="Zoom in"></button></div>
+      <button id="bExitFocus" class="focuspill" title="Leave focus mode ( \ or Esc )">Exit focus</button>
+      <div class="zoompill"><button id="bPage" class="icon tog" title="Show only the area with bands / the full page"></button><button id="zOut" class="icon" title="Zoom out"></button><button id="zval"></button><button id="zIn" class="icon" title="Zoom in"></button></div>
     </div>
     <div id="props"></div>
+    <div class="vsplit" id="splitL" title="Drag to resize, double-click to reset"></div>
+    <div class="vsplit" id="splitR" title="Drag to resize, double-click to reset"></div>
   </div>
-  <div id="status"><span id="statSel"></span><span class="sp"></span><span>Drag to move (pink guides align and space) · arrows nudge · Alt = no snap · Ctrl+Z undo · Ctrl+D duplicate</span></div>
+  <div id="status"><span id="statSel"></span><span class="sp"></span><span>Drag to move (pink guides align and space) · arrows nudge · Alt = no snap · [ ] hide panels · \\ focus · Ctrl+Z undo · Ctrl+D duplicate</span></div>
 </div>
 <div id="bandMenu" hidden></div>
 <dialog id="jsonDlg">
@@ -469,6 +505,8 @@ const ICONS = {
   vTop: '<path d="M5 5h14"/><rect x="9" y="8" width="6" height="10" rx="1"/>', vMid: '<path d="M5 12h14"/><rect x="9" y="6" width="6" height="12" rx="1"/>',
   vBot: '<path d="M5 19h14"/><rect x="9" y="6" width="6" height="10" rx="1"/>',
   up: '<path d="M12 19V5M6 11l6-6 6 6"/>', down: '<path d="M12 5v14M6 13l6 6 6-6"/>', back: '<path d="M15 6l-6 6 6 6"/>',
+  panelL: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M9.5 5v14"/>', panelR: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M14.5 5v14"/>',
+  focus: '<path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/>', page: '<rect x="6" y="3.5" width="12" height="17" rx="1.5"/><path d="M9 8h6M9 12h6"/>',
   wand: '<path d="M5 19L15 9M14 4v3M12.5 5.5h3M19 11v3M17.5 12.5h3M4 6h2M5 5v2"/>',
   table: '<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 10h16M4 14.5h16M10 5v14"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="5" cy="6" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="18" r="1"/>',
@@ -681,7 +719,7 @@ function renderCanvas() {
   page.append(buildRuler());
   const m = def.page.margin * zoom;
   const sheet = document.createElement('div'); sheet.className = 'sheet';
-  sheet.style.width = def.page.width * zoom + 'px'; sheet.style.minHeight = def.page.height * zoom + 'px';
+  sheet.style.width = def.page.width * zoom + 'px'; sheet.style.minHeight = layout.contentOnly ? '0' : def.page.height * zoom + 'px';
   sheet.style.padding = m + 'px';
   sheet.onpointerdown = ev => { if (ev.target === sheet) select({ kind: 'report' }); };
   const guide = document.createElement('div'); guide.className = 'guide';
@@ -1357,6 +1395,7 @@ function renderProps() {
   else if (sel.kind === 'element') elementProps(p, curEl());
   else if (sel.kind === 'band') bandProps(p, curBand());
   else reportProps(p);
+  compactProps();
 }
 
 function elementProps(p, e) {
@@ -1537,13 +1576,69 @@ function initChrome() {
   $('bSave').innerHTML = ico('save') + 'Save'; $('bSaveAs').innerHTML = ico('saveas'); $('bSaveAs').title = 'Save as…';
   $('bUndo').innerHTML = ico('undo'); $('bRedo').innerHTML = ico('redo');
   $('zOut').innerHTML = ico('minus'); $('zIn').innerHTML = ico('plus'); $('bJson').innerHTML = ico('json') + 'JSON'; $('bPreview').innerHTML = ico('eye') + 'Preview'; $('bRdlc').innerHTML = ico('layers') + 'Import RDLC';
+  $('bPanL').innerHTML = ico('panelL'); $('bPanR').innerHTML = ico('panelR'); $('bFocus').innerHTML = ico('focus'); $('bPage').innerHTML = ico('page');
   showZoom();
 }
 function showZoom() { $('zval').title = 'Click to fit the page width'; $('zval').textContent = Math.round(zoom / 4 * 100) + '%'; }
+// ---------------------------------------------------------------- workspace layout
+const LAYOUT_KEY = 'clio.layout';
+const layout = { wL: 232, wR: 304, hideL: false, hideR: false, contentOnly: false };
+try { Object.assign(layout, JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}')); } catch { }
+let autoFit = true, fitTimer = 0;
+function saveLayout() { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { } }
+function applyLayout() {
+  const root = document.documentElement.style;
+  root.setProperty('--wL', layout.wL + 'px'); root.setProperty('--wR', layout.wR + 'px');
+  document.body.classList.toggle('hideL', layout.hideL); document.body.classList.toggle('hideR', layout.hideR);
+  $('bPanL').classList.toggle('on', !layout.hideL); $('bPanR').classList.toggle('on', !layout.hideR);
+  $('bPage').classList.toggle('on', layout.contentOnly);
+  $('bFocus').classList.toggle('on', document.body.classList.contains('focus'));
+}
+function relayout() { clearTimeout(fitTimer); fitTimer = setTimeout(() => { if (autoFit) fitZoom(); }, 30); }
+function toggleLeft() { layout.hideL = !layout.hideL; saveLayout(); applyLayout(); relayout(); }
+function toggleRight() { layout.hideR = !layout.hideR; saveLayout(); applyLayout(); relayout(); }
+function toggleFocus() { document.body.classList.toggle('focus'); applyLayout(); relayout(); }
+function toggleContentOnly() { layout.contentOnly = !layout.contentOnly; saveLayout(); applyLayout(); renderCanvas(); }
+function splitter(id, key, side, min, max, dflt) {
+  const h = $(id);
+  h.onpointerdown = ev => {
+    ev.preventDefault(); h.setPointerCapture(ev.pointerId); h.classList.add('on');
+    const x0 = ev.clientX, w0 = layout[key];
+    h.onpointermove = m => { layout[key] = Math.round(Math.min(max, Math.max(min, w0 + (m.clientX - x0) * side))); applyLayout(); };
+    h.onpointerup = () => { h.onpointermove = h.onpointerup = null; h.classList.remove('on'); saveLayout(); relayout(); };
+  };
+  h.ondblclick = () => { layout[key] = dflt; saveLayout(); applyLayout(); relayout(); };
+}
+splitter('splitL', 'wL', 1, 150, 480, 232); splitter('splitR', 'wR', -1, 220, 560, 304);
+$('bPanL').onclick = toggleLeft; $('bPanR').onclick = toggleRight; $('bFocus').onclick = toggleFocus; $('bExitFocus').onclick = toggleFocus; $('bPage').onclick = toggleContentOnly;
+window.addEventListener('resize', relayout);
+applyLayout();
+
+// Properties: sections fold (remembered), fields flow in two columns when the panel is wide enough (CSS).
+let propClosed = new Set(); try { propClosed = new Set(JSON.parse(localStorage.getItem('clio.propClosed') || '[]')); } catch { }
+function compactProps() {
+  const p = $('props'); let sec = null;
+  for (const k of [...p.children]) {
+    if (k.tagName === 'H4') {
+      const key = k.textContent.replace(/\s*\(.*$/, '').trim(), box = document.createElement('div'); box.className = 'psec';
+      k.classList.add('collapsible'); k.after(box); sec = box;
+      if (propClosed.has(key)) { k.classList.add('closed'); box.hidden = true; }
+      k.onclick = () => {
+        const closed = !box.hidden; box.hidden = closed; k.classList.toggle('closed', closed);
+        closed ? propClosed.add(key) : propClosed.delete(key);
+        try { localStorage.setItem('clio.propClosed', JSON.stringify([...propClosed])); } catch { }
+      };
+    } else if (sec && !k.classList.contains('actions')) sec.append(k);
+    else if (k.classList.contains('actions')) sec = null;
+  }
+}
+
 function stepZoom(d) {
+  autoFit = false;
   zoom = Math.min(12, Math.max(1.5, zoom * (d > 0 ? 1.15 : 1 / 1.15))); showZoom(); renderCanvas();
 }
 function fitZoom() {
+  autoFit = true;
   const room = $("stage").clientWidth - 210 - 44;
   if (room > 100) zoom = Math.min(8, Math.max(1.5, room / def.page.width));
   showZoom(); renderCanvas();
@@ -1698,6 +1793,10 @@ window.addEventListener('keydown', ev => {
     ev.preventDefault(); const bi = sel.b;
     setMulti(bi, def.bands[bi].elements.map((_, i) => [i]));
   }
+  else if (ev.key === '[') toggleLeft();
+  else if (ev.key === ']') toggleRight();
+  else if (ev.key === '\\') toggleFocus();
+  else if (ev.key === 'Escape' && document.body.classList.contains('focus')) toggleFocus();
   else if (ev.key === 'Escape' && sel.kind === 'element') select(sel.path.length > 1 ? { kind: 'element', b: sel.b, path: sel.path.slice(0, -1) } : { kind: 'band', b: sel.b });
   else if (sel.kind === 'element' && ev.key.startsWith('Arrow')) {
     ev.preventDefault();

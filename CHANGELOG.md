@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Designer workspace: the Structure and Properties panels can be hidden (`[` and `]`, or the toolbar buttons) and resized by dragging their edge (double-click resets); *Focus mode* (`\` or Esc to leave) shows only the canvas; a button next to the zoom shows only the area with bands instead of the whole blank page; Properties sections fold (remembered) and fields flow in two columns when the panel is wide. The zoom re-fits the width when the layout changes. Layout is remembered per browser.
+
 ## 0.1.0-alpha.6 (2026-10-19)
 
 - Designer: *Table wizard* (wand button in the left rail, or *Table wizard…* in a table's properties). Pick a collection and its fields from the loaded sample data (or add columns by hand), set header, alignment, width and format per column, then insert a new table or apply the result to the selected one.
