@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Designer workspace: the Structure and Properties panels can be hidden (`[` and `]`, or the toolbar buttons) and resized by dragging their edge (double-click resets); *Focus mode* (`\` or Esc to leave) shows only the canvas; a button next to the zoom shows only the area with bands instead of the whole blank page; Properties sections fold (remembered) and fields flow in two columns when the panel is wide. The zoom re-fits the width when the layout changes. Layout is remembered per browser.
+- Designer workspace: the Structure and Properties panels can be hidden (`[` and `]`, or the toolbar buttons) and resized by dragging their edge (double-click resets); *Focus mode* (`\` or Esc to leave) shows only the canvas; a button next to the zoom shows only the area with bands instead of the whole blank page; Properties sections fold (remembered) and fields flow in two columns when the panel is wide. The zoom re-fits the width when the layout changes. Layout is remembered per browser.
+- Designer: zoom and pan like a design tool. `Ctrl` + wheel (or trackpad pinch) zooms around the pointer; hold `Space` and drag, or drag with the middle button, to pan; `Ctrl` + `0` fits the width, `Ctrl` + `+`/`-` zoom in steps.
 
 ## 0.1.0-alpha.6 (2026-10-19)
 

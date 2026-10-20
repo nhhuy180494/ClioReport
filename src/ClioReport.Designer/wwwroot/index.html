@@ -83,6 +83,8 @@ body.focus { --wL: 0px; --wR: 0px; --wRail: 0px; }
 body.focus #app { grid-template-rows: 0 1fr 0; }
 body.focus #top, body.focus #status, body.focus #rail, body.focus #outline, body.focus #props { visibility: hidden; overflow: hidden; padding: 0; border: 0; }
 body.focus #stage { padding-left: 190px; }
+body.panready #stage, body.panready #stage * { cursor: grab !important; }
+body.panning #stage, body.panning #stage * { cursor: grabbing !important; }
 .vsplit { position: absolute; top: 0; bottom: 0; width: 7px; cursor: col-resize; z-index: 40; }
 .vsplit::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent; transition: background .12s; }
 .vsplit:hover::after, .vsplit.on::after { background: var(--accent); width: 2px; left: 2.5px; }
@@ -330,7 +332,7 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     <div class="vsplit" id="splitL" title="Drag to resize, double-click to reset"></div>
     <div class="vsplit" id="splitR" title="Drag to resize, double-click to reset"></div>
   </div>
-  <div id="status"><span id="statSel"></span><span class="sp"></span><span>Drag to move (pink guides align and space) · arrows nudge · Alt = no snap · [ ] hide panels · \\ focus · Ctrl+Z undo · Ctrl+D duplicate</span></div>
+  <div id="status"><span id="statSel"></span><span class="sp"></span><span>Drag to move (pink guides align and space) · arrows nudge · Alt = no snap · Ctrl+wheel zoom · Space+drag pan · [ ] hide panels · \\ focus · Ctrl+Z undo · Ctrl+D duplicate</span></div>
 </div>
 <div id="bandMenu" hidden></div>
 <dialog id="jsonDlg">
@@ -1632,6 +1634,50 @@ function compactProps() {
     else if (k.classList.contains('actions')) sec = null;
   }
 }
+
+// Zoom and pan like a design tool: Ctrl + wheel (or a trackpad pinch) zooms around the pointer; hold Space and drag, or drag with
+// the middle button, to pan. Ctrl + 0 fits the width, Ctrl + / - zoom in steps.
+function zoomAt(newZoom, cx, cy) {
+  newZoom = Math.min(12, Math.max(1.5, newZoom)); if (Math.abs(newZoom - zoom) < 1e-6) return;
+  const stage = $('stage'), sheet = stage.querySelector('.sheet'), old = zoom;
+  const r0 = sheet ? sheet.getBoundingClientRect() : null;
+  autoFit = false; zoom = newZoom; showZoom(); renderCanvas();
+  const sh = stage.querySelector('.sheet');
+  if (r0 && sh) {            // keep the point under the pointer where it was
+    const r1 = sh.getBoundingClientRect();
+    stage.scrollLeft += r1.left + (cx - r0.left) / old * zoom - cx;
+    stage.scrollTop += r1.top + (cy - r0.top) / old * zoom - cy;
+  }
+}
+$('stage').addEventListener('wheel', ev => {
+  if (!ev.ctrlKey && !ev.metaKey) return;
+  ev.preventDefault();
+  const unit = ev.deltaMode === 1 ? 16 : 1;                 // lines -> pixels
+  zoomAt(zoom * Math.exp(-ev.deltaY * unit * 0.0016), ev.clientX, ev.clientY);
+}, { passive: false });
+let spaceDown = false;
+const panOk = () => { const a = document.activeElement; return !a || a === document.body || $('stage').contains(a); };
+window.addEventListener('keydown', ev => {
+  if (ev.code === 'Space' && !ev.repeat && panOk() && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+    spaceDown = true; document.body.classList.add('panready'); ev.preventDefault();
+  } else if (ev.code === 'Space' && spaceDown) ev.preventDefault();
+  else if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && ['0', '=', '+', '-'].includes(ev.key) && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+    ev.preventDefault();
+    if (ev.key === '0') fitZoom(); else { const r = $('stage').getBoundingClientRect(); zoomAt(zoom * (ev.key === '-' ? 1 / 1.15 : 1.15), r.left + r.width / 2, r.top + r.height / 2); }
+  }
+}, true);
+window.addEventListener('keyup', ev => { if (ev.code === 'Space') { spaceDown = false; document.body.classList.remove('panready'); } });
+window.addEventListener('blur', () => { spaceDown = false; document.body.classList.remove('panready'); });
+$('stage').addEventListener('pointerdown', ev => {
+  if (!(ev.button === 1 || (ev.button === 0 && spaceDown))) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const stage = $('stage'); let x = ev.clientX, y = ev.clientY;
+  document.body.classList.add('panning');
+  const move = m => { stage.scrollLeft -= m.clientX - x; stage.scrollTop -= m.clientY - y; x = m.clientX; y = m.clientY; };
+  const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); document.body.classList.remove('panning'); };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+}, true);
+$('stage').addEventListener('mousedown', ev => { if (ev.button === 1) ev.preventDefault(); }, true);   // no middle-click autoscroll
 
 function stepZoom(d) {
   autoFit = false;
