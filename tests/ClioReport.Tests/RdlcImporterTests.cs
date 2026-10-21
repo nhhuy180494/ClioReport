@@ -144,7 +144,7 @@ public class RdlcImporterTests
         var result = RdlcImporter.ImportXml(Sample());
         var data = new Dictionary<string, object?>
         {
-            ["company"] = "Kugil",
+            ["company"] = "Sample",
             ["items"] = new List<Dictionary<string, object?>>
             {
                 new() { ["kho"] = "A", ["code"] = "X1", ["qty"] = 1200m },
@@ -160,7 +160,7 @@ public class RdlcImporterTests
         Assert.Contains("1500", texts);     // kho A total
         Assert.Contains("1505 pcs", texts); // report total
         Assert.Contains("Trang 1/1", texts);
-        Assert.Contains("Kugil", texts);
+        Assert.Contains("Sample", texts);
     }
 
     [Fact]
