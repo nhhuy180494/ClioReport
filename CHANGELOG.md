@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- RDLC import: `First(Fields!X.Value, ...)` of a plain field now becomes `X` instead of `(X)`.
+
 ## 0.1.0-alpha.8 (2026-10-23)
 
 - Designer: the fields of the data are saved in the report (optional `schema`: field names and types per collection). Paste or load a JSON example once (*Report > Data fields > Define from JSON…*, or by loading a sample); the *Data fields* lists and the Table wizard then work without loading any file. The engine ignores `schema`.

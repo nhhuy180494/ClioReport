@@ -242,6 +242,22 @@ public class RdlcImporterTests
         $"<Paragraph><TextRuns><TextRun><Value>{text}</Value><Style>{runStyle}</Style></TextRun></TextRuns></Paragraph>";
 
     [Fact]
+    public void First_OfAField_HasNoExtraParentheses()
+    {
+        var xml = Report(Box("T", Para("=First(Fields!address.Value, &quot;DS&quot;)")));
+        var e = RdlcImporter.ImportXml(xml).Definition.Bands[0].Elements[0];
+        Assert.Equal("address", e.Expression);
+    }
+
+    [Fact]
+    public void First_OfAnExpression_KeepsItsParentheses()
+    {
+        var xml = Report(Box("T", Para("=First(Fields!a.Value + Fields!b.Value, &quot;DS&quot;) * 2")));
+        var e = RdlcImporter.ImportXml(xml).Definition.Bands[0].Elements[0];
+        Assert.Equal("(a + b) * 2", e.Expression);
+    }
+
+    [Fact]
     public void IIf_and_First_are_translated()
     {
         var xml = Report(Box("T", Para("=IIf(Fields!a.Value = &quot;P&quot;, &quot;Pass&quot;, &quot;Fail&quot;) &amp; First(Fields!b.Value, &quot;DS&quot;)")));

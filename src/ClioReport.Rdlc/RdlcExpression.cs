@@ -79,7 +79,9 @@ internal sealed class RdlcExpression(List<AggregateDefinition> aggregates, HashS
                 var fInner = Scalar(fArgs[0], scopeGroup, out problem);
                 if (fInner is null) return null;
                 FirstUsed = true;
-                s = s[..m.Index] + "(" + fInner + ")" + s[(fClose + 1)..];
+                // a plain field name needs no parentheses; anything else keeps them so operator precedence survives
+                var simple = Regex.IsMatch(fInner, @"^\s*[\w.]+\s*$");
+                s = s[..m.Index] + (simple ? fInner.Trim() : "(" + fInner + ")") + s[(fClose + 1)..];
                 continue;
             }
 
