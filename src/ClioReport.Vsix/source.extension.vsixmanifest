@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="ClioReport.Designer.37f51c2f-2d7f-4cce-9002-f0f183125a24" Version="0.1.8" Language="en-US" Publisher="nhhuy" />
+    <Identity Id="ClioReport.Designer.37f51c2f-2d7f-4cce-9002-f0f183125a24" Version="0.1.9" Language="en-US" Publisher="nhhuy" />
     <DisplayName>ClioReport Designer</DisplayName>
     <Description xml:space="preserve">Design band-based reports for the ClioReport .NET library without leaving Visual Studio: open .clio report files in a visual designer, preview the PDF, and import RDLC reports. Needs the .NET 8 runtime and the WebView2 runtime.</Description>
     <MoreInfo>https://github.com/nhhuy180494/ClioReport</MoreInfo>

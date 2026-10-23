@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.8 (2026-10-23)
+
+- Designer: the fields of the data are saved in the report (optional `schema`: field names and types per collection). Paste or load a JSON example once (*Report > Data fields > Define from JSON…*, or by loading a sample); the *Data fields* lists and the Table wizard then work without loading any file. The engine ignores `schema`.
+
+- Table total row: a column can set `total` (`sum`, `count`, `avg`, `min`, `max`), plus `totalFormat` and the table's `totalLabel`; the table ends with a bold total row. Designer: *Total* and *Total format* per column, *Total label* in Table style. Needs a table with a `source`.
+
+- Designer: *Data fields* section in the properties of text, barcode and QR elements. It lists the row fields of the data source, the report fields and the variables (PageNumber, PageCount, aggregates) from the loaded sample data, with their types; a click inserts the name into the Expression box at the caret.
+
 ## 0.1.0-alpha.7 (2026-10-20)
 
 - Image elements: a path with a leading `/` or `\` (such as `/systemConfig/logo.png`) is now relative to `PdfRenderOptions.ImageRoot` instead of failing.

@@ -123,6 +123,9 @@ public sealed class ElementDefinition
     /// </summary>
     public string? Source { get; set; }
 
+    /// <summary>"table": text of the total row's first column that has no total (e.g. "Total").</summary>
+    public string? TotalLabel { get; set; }
+
     /// <summary>"table": fixed rows instead of <see cref="Source"/>. Each cell is text, or an expression when it starts with "=".</summary>
     public List<List<string>>? Rows { get; set; }
 
@@ -178,4 +181,13 @@ public sealed class ColumnDefinition
     public double Width { get; set; }
 
     public TextAlign Align { get; set; }
+
+    /// <summary>
+    /// Adds this column to the total row at the bottom of a table that has a <c>source</c>: the function runs over the
+    /// column's expression for every row (nulls skipped, as for aggregates). Needs an <see cref="Expression"/>.
+    /// </summary>
+    public AggregateFunction? Total { get; set; }
+
+    /// <summary>.NET format string for the total (e.g. "N0"); without it the value prints like a normal cell.</summary>
+    public string? TotalFormat { get; set; }
 }

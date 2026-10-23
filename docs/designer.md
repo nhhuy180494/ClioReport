@@ -118,9 +118,19 @@ var ctx = new ObjectDataContext(rows.FirstOrDefault(),
   Inside a detail band, a field is looked up in the current row first, then in the root. `data[0]` throws on an empty list, so use `FirstOrDefault()`.
 - The sample JSON of the designer has the same shape: values for the root and arrays for the collections.
 
+## Data fields
+
+Define the fields once and they are kept in the report. In *Report > Data fields* (or at the bottom of an element's *Data fields* section) choose **Define from JSON…**, paste an example of the data (an object with values and lists of rows, or just a list of rows) or pick a file, and press **Use**. The names and types (text, number, date) are stored in the `.clio` file under `schema`; loading a sample while the report has none saves them automatically. After that the fields are listed, and offered by the Table wizard, without loading any file. A sample that is loaded takes precedence while it is there; **Update from sample** replaces the saved fields with it and **Clear** removes them. The engine ignores `schema`.
+
 ## Sample data
 
+With a text, barcode or QR element selected, the **Data fields** section of the Properties panel lists what the sample offers: the fields of the data source's rows, the report-level fields, and the variables (`PageNumber`, `PageCount`, your aggregates). Click one to insert it into the Expression box at the caret (a box holding only a field name is replaced). *Load sample data…* there loads the file without opening the preview.
+
 *Preview > Sample data…* loads a JSON file: an object whose properties are values (`"Customer": "ACME"`) and arrays of rows (`"items": [ { "Name": "...", "Qty": 2 } ]`). It is used for the preview and to list the fields in the Table wizard. It is remembered in the browser and is never written into the report.
+
+## Table total row
+
+In a table that reads a collection (*source*), set **Total** on a column (`sum`, `count`, `avg`, `min`, `max`) to end the table with a total row. The value is computed over the column's expression for every row (nulls skipped). **Total format** takes a .NET format such as `N0` or `N2`; **Total label** (Table style) is the text in the first column that has no total, e.g. `Total`. The row is bold and filled like the header. Fixed-row tables cannot have totals.
 
 ## Fonts
 

@@ -39,6 +39,39 @@ public class ReportTableListTests
         Assert.Equal(TextAlignOf(cells[1]), TextAlignOf(cells[3]));
     }
 
+    [Fact]
+    public void Table_TotalRow_SumsColumns_AndLabelsFirstPlainColumn()
+    {
+        var data = new { lines = new[] { new { name = "a", qty = 2, amount = 1500.4m }, new { name = "b", qty = 3, amount = 2000m } } };
+        var r = Render("""
+          { "type": "reportHeader", "height": 5, "elements": [ {
+            "type": "table", "x": 0, "y": 0, "width": 100, "rowHeight": 6, "showHeader": false, "fill": "#EEEEEE", "totalLabel": "Total",
+            "source": "lines",
+            "columns": [ { "header": "Name", "expression": "name", "width": 40 },
+                         { "header": "Qty", "expression": "qty", "width": 20, "total": "sum" },
+                         { "header": "Amount", "expression": "amount", "total": "sum", "totalFormat": "N0" } ] } ] }
+          """, data);
+
+        var cells = Elements(r);
+
+        Assert.Equal(new[] { "a", "2", "1500.4", "b", "3", "2000", "Total", "5", "3,500" }, cells.Select(c => c.Text));
+        var last = cells.Skip(6).ToList();
+        Assert.All(last, c => Assert.True(c.Style.Bold));
+        Assert.All(last, c => Assert.Equal("#EEEEEE", c.Fill));
+        Assert.Equal(cells[0].Y + 12, last[0].Y, 3);
+    }
+
+    [Fact]
+    public void Table_TotalOnFixedRows_IsRejected()
+    {
+        var ex = Assert.Throws<ReportException>(() => Render("""
+          { "type": "reportHeader", "height": 5, "elements": [ {
+            "type": "table", "x": 0, "y": 0, "width": 100,
+            "columns": [ { "header": "A", "expression": "x", "total": "sum" } ], "rows": [ [ "1" ] ] } ] }
+          """));
+        Assert.Contains("source", ex.Message);
+    }
+
     private static Model.TextAlign TextAlignOf(RenderedElement e) => e.Align;
 
     [Fact]

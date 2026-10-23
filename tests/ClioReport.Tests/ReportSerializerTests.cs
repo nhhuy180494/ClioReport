@@ -47,6 +47,20 @@ public class ReportSerializerTests
         Assert.Equal(def.Bands.Count, again.Bands.Count);
     }
 
+    [Fact]
+    public void Schema_IsOptional_AndRoundTrips()
+    {
+        Assert.Null(ReportSerializer.Deserialize(Json).Schema);
+
+        var withSchema = Json.Replace("\"aggregates\"", "\"schema\": { \"root\": [ { \"name\": \"DocNo\", \"type\": \"text\" } ], \"collections\": [ { \"name\": \"items\", \"fields\": [ { \"name\": \"Qty\", \"type\": \"number\" } ] } ] }, \"aggregates\"");
+        var again = ReportSerializer.Deserialize(ReportSerializer.Serialize(ReportSerializer.Deserialize(withSchema)));
+
+        Assert.Equal("DocNo", Assert.Single(again.Schema!.Root).Name);
+        var items = Assert.Single(again.Schema.Collections);
+        Assert.Equal("items", items.Name);
+        Assert.Equal("number", Assert.Single(items.Fields).Type);
+    }
+
     [Theory]
     [InlineData("""{ "name": "x" }""")]
     [InlineData("""{ "version": 99 }""")]

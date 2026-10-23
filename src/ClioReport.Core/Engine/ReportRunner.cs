@@ -252,6 +252,13 @@ internal sealed class ReportRunner
                 throw new ReportException($"{b.Type} band: the table columns do not fit in the table width ({e.Width} mm).");
             if (e.Padding > 0 && ColumnWidths(e).Any(w => 2 * e.Padding >= w))
                 throw new ReportException($"{b.Type} band: table padding is too large for the narrowest column.");
+            foreach (var c in e.Columns.Where(c => c.Total is not null))
+            {
+                if (e.Rows is not null)
+                    throw new ReportException($"{b.Type} band: a total row needs a table with a 'source', not fixed 'rows'.");
+                if (string.IsNullOrWhiteSpace(c.Expression))
+                    throw new ReportException($"{b.Type} band: table column '{c.Header}' has a total but no expression.");
+            }
             if (e.Rows is not null && e.Rows.Any(r => r.Count > e.Columns.Count))
                 throw new ReportException($"{b.Type} band: a table row has more cells than the table has columns.");
         }
@@ -606,17 +613,33 @@ internal sealed class ReportRunner
         }
         else
         {
+            var totals = columns.Select(c => c.Total is { } fn
+                ? new AggregateState(new AggregateDefinition { Name = c.Header, Function = fn, Expression = c.Expression! }, Compile(c.Expression!))
+                : null).ToArray();
             foreach (var item in ctx.GetRows(e.Source!))
             {
                 var rowCtx = ctx.WithRow(item);
                 var texts = columns.Select(c => !string.IsNullOrWhiteSpace(c.Expression)
                     ? Values.Str(Eval(c.Expression!, rowCtx)) : c.Text ?? "").ToArray();
                 AddRow(texts, rowHeight, e.Bold, index++ % 2 == 1 ? e.AltFill : null);
+                foreach (var t in totals) t?.Add(rowCtx);
+            }
+
+            if (totals.Any(t => t is not null))
+            {
+                var label = Array.FindIndex(totals, t => t is null);
+                var texts = columns.Select((c, i) => totals[i] is { } t ? FormatTotal(t.Value, c.TotalFormat)
+                    : i == label ? e.TotalLabel ?? "" : "").ToArray();
+                AddRow(texts, rowHeight, true, e.Fill);
             }
         }
 
         height = Math.Max(height, y);
     }
+
+    private static string FormatTotal(object? value, string? format) =>
+        value is null ? "" : !string.IsNullOrEmpty(format) && value is IFormattable f
+            ? f.ToString(format, System.Globalization.CultureInfo.InvariantCulture) : Values.Str(value);
 
     private string StaticCell(string cell, EngineContext ctx) =>
         cell.StartsWith('=') ? Values.Str(Eval(cell[1..], ctx)) : cell;
