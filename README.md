@@ -1,5 +1,7 @@
 # ClioReport
 
+[![CI](https://github.com/nhhuy180494/ClioReport/actions/workflows/ci.yml/badge.svg)](https://github.com/nhhuy180494/ClioReport/actions/workflows/ci.yml)
+
 Band-based report builder library for .NET 8 (MIT). Define a report as versioned JSON (bands, groups, aggregates, expressions), feed it any data source, get positioned pages, render them to PDF.
 
 > Status: alpha (0.1.0-alpha.x), published on NuGet as prerelease packages; the API may change.
@@ -61,6 +63,14 @@ Rows must already be sorted by the group expressions. See `samples/PhieuXuatKho`
 ### Fonts
 
 The PDF package uses PDFsharp Core, which loads no fonts by itself. By default `arial.ttf` from the Windows fonts folder is used (it covers Vietnamese). On other platforms, or for another font, set `PdfRenderOptions.FontFilePath` (pass the same options to `PdfTextMeasurer` and `PdfReportRenderer`), or assign `GlobalFontSettings.FontResolver` yourself.
+
+### Linux and Docker
+
+The PDF renderer is managed code (PDFsharp Core): it needs no `libgdiplus` and no fonts installed in the image. Every push is built and tested on Ubuntu and Windows (see the CI badge). On Linux:
+
+- Add the `ClioReport.Pdf.Fonts` package and call `options.UseBundledFonts()` on the `PdfRenderOptions` you pass to `PdfTextMeasurer` and `PdfReportRenderer`. It registers Liberation Sans/Serif/Mono as Arial/Times New Roman/Courier New and Nanum Gothic for Hangul.
+- Set `PdfRenderOptions.ImageRoot` to the folder your image paths are relative to (for example `Path.Combine(env.ContentRootPath, "wwwroot")`); paths are case-sensitive on Linux and cannot leave that folder. A missing file prints a *No image* box.
+- Use `/` in image paths and file names; `\` is an escape character inside report expressions.
 
 ## Projects
 

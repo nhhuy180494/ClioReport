@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CI: GitHub Actions builds and tests every push and pull request on Ubuntu and Windows. README: Linux and Docker section.
+
 - RDLC import: `First(Fields!X.Value, ...)` of a plain field now becomes `X` instead of `(X)`.
 
 ## 0.1.0-alpha.8 (2026-10-23)
