@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Tests: the PDF render tests no longer skip themselves on machines without Arial; they use the bundled fonts, so CI on Ubuntu really renders PDFs.
+
 - CI: GitHub Actions builds and tests every push and pull request on Ubuntu and Windows. README: Linux and Docker section.
 
 - RDLC import: `First(Fields!X.Value, ...)` of a plain field now becomes `X` instead of `(X)`.

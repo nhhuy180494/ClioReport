@@ -9,10 +9,6 @@ public class PdfReportRendererTests
     [Fact]
     public void Render_ProducesPdfBytes()
     {
-        // Needs a TrueType font; returns early on machines without Arial.
-        var fontPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "arial.ttf");
-        if (!File.Exists(fontPath)) return;
-
         var definition = new ReportDefinition
         {
             Version = 1,
@@ -29,7 +25,7 @@ public class PdfReportRendererTests
         var report = ReportEngine.Render(definition, new DictionaryDataContext());
 
         using var stream = new MemoryStream();
-        PdfReportRenderer.Render(report, stream, new PdfRenderOptions { FontFilePath = fontPath });
+        PdfReportRenderer.Render(report, stream, Options());
 
         var bytes = stream.ToArray();
         Assert.True(bytes.Length > 100);
@@ -39,10 +35,7 @@ public class PdfReportRendererTests
     [Fact]
     public void Measurer_AndWrappedRender_Work()
     {
-        var fontPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "arial.ttf");
-        if (!File.Exists(fontPath)) return;
-
-        var options = new PdfRenderOptions { FontFilePath = fontPath };
+        var options = Options();
         using var measurer = new PdfTextMeasurer(options);
 
         Assert.True(measurer.LineHeight > 0);
@@ -82,10 +75,13 @@ public class PdfReportRendererTests
     private const string PngBase64 =
         "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEUlEQVR4nGP4z8DA8B+MgBgAHfAD/dPQfSYAAAAASUVORK5CYII=";
 
-    private static string? FontPath()
+    // Arial from the Windows fonts folder when it exists, otherwise the bundled fonts, so the render tests also run on Linux.
+    private static PdfRenderOptions Options(string? imageRoot = null)
     {
-        var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "arial.ttf");
-        return File.Exists(path) ? path : null;
+        var arial = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "arial.ttf");
+        var options = File.Exists(arial) ? new PdfRenderOptions { FontFilePath = arial } : new PdfRenderOptions().UseBundledFonts();
+        options.ImageRoot = imageRoot;
+        return options;
     }
 
     private static byte[] RenderPdf(string elementJson, object root, PdfRenderOptions options)
@@ -106,9 +102,7 @@ public class PdfReportRendererTests
     [Fact]
     public void Barcode_AndImage_AreDrawn()
     {
-        var fontPath = FontPath();
-        if (fontPath is null) return;
-        var options = new PdfRenderOptions { FontFilePath = fontPath };
+        var options = Options();
         var png = Convert.FromBase64String(PngBase64);
 
         // Baseline draws no text, so no font is embedded: size differences come from the barcode/image only.
@@ -126,21 +120,15 @@ public class PdfReportRendererTests
     [Fact]
     public void ImagePath_WithoutImageRoot_Throws()
     {
-        var fontPath = FontPath();
-        if (fontPath is null) return;
-
         Assert.Throws<InvalidOperationException>(() => RenderPdf(
             """{ "type": "image", "width": 20, "height": 10, "text": "logo.png" }""",
             new { },
-            new PdfRenderOptions { FontFilePath = fontPath }));
+            Options()));
     }
 
     [Fact]
     public void ImagePath_MustStayInsideImageRoot()
     {
-        var fontPath = FontPath();
-        if (fontPath is null) return;
-
         var root = Path.Combine(Path.GetTempPath(), "clioreport-" + Guid.NewGuid().ToString("N"));
         var images = Path.Combine(root, "images");
         Directory.CreateDirectory(images);
@@ -148,7 +136,7 @@ public class PdfReportRendererTests
         {
             File.WriteAllBytes(Path.Combine(images, "logo.png"), Convert.FromBase64String(PngBase64));
             File.WriteAllBytes(Path.Combine(root, "secret.png"), Convert.FromBase64String(PngBase64));
-            var options = new PdfRenderOptions { FontFilePath = fontPath, ImageRoot = images };
+            var options = Options(images);
 
             var ok = RenderPdf("""{ "type": "image", "width": 20, "height": 10, "text": "logo.png" }""", new { }, options);
 
@@ -165,15 +153,12 @@ public class PdfReportRendererTests
     [Fact]
     public void ImagePath_WithLeadingSlash_IsRelativeToImageRoot()
     {
-        var fontPath = FontPath();
-        if (fontPath is null) return;
-
         var root = Path.Combine(Path.GetTempPath(), "clioreport-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "uploads"));
         try
         {
             File.WriteAllBytes(Path.Combine(root, "uploads", "logo.png"), Convert.FromBase64String(PngBase64));
-            var options = new PdfRenderOptions { FontFilePath = fontPath, ImageRoot = root };
+            var options = Options(root);
 
             var plain = RenderPdf("""{ "type": "image", "width": 20, "height": 10, "text": "nope.png" }""", new { }, options);
             var withLogo = RenderPdf("""{ "type": "image", "width": 20, "height": 10, "text": "/uploads/logo.png" }""", new { }, options);
@@ -190,14 +175,11 @@ public class PdfReportRendererTests
     [Fact]
     public void MissingImage_DrawsPlaceholder_InsteadOfFailing()
     {
-        var fontPath = FontPath();
-        if (fontPath is null) return;
-
         var root = Path.Combine(Path.GetTempPath(), "clioreport-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
-            var options = new PdfRenderOptions { FontFilePath = fontPath, ImageRoot = root };
+            var options = Options(root);
             var plain = RenderPdf("""{ "type": "rect", "width": 1, "height": 1 }""", new { }, options);
 
             var notFound = RenderPdf("""{ "type": "image", "width": 30, "height": 12, "text": "nope.png" }""", new { }, options);
@@ -218,9 +200,7 @@ public class PdfReportRendererTests
     [Fact]
     public void BoldItalicAndFontSize_AreRendered()
     {
-        var fontPath = FontPath();
-        if (fontPath is null) return;
-        var options = new PdfRenderOptions { FontFilePath = fontPath };
+        var options = Options();
 
         var pdf = RenderPdf(
             """{ "width": 60, "height": 8, "bold": true, "italic": true, "fontSize": 16, "text": "Phiếu xuất kho" }""",
@@ -232,9 +212,7 @@ public class PdfReportRendererTests
     [Fact]
     public void Measurer_UsesFontSize()
     {
-        var fontPath = FontPath();
-        if (fontPath is null) return;
-        using var measurer = new PdfTextMeasurer(new PdfRenderOptions { FontFilePath = fontPath });
+        using var measurer = new PdfTextMeasurer(Options());
 
         var small = measurer.MeasureWidth("Phiếu xuất kho", new TextStyle(FontSize: 10));
         var large = measurer.MeasureWidth("Phiếu xuất kho", new TextStyle(FontSize: 20));
@@ -247,9 +225,7 @@ public class PdfReportRendererTests
     [Fact]
     public void ColorFillAndBorder_AreRendered()
     {
-        var fontPath = FontPath();
-        if (fontPath is null) return;
-        var options = new PdfRenderOptions { FontFilePath = fontPath };
+        var options = Options();
 
         var plain = RenderPdf("""{ "width": 40, "height": 6, "text": "x" }""", new { }, options);
         var styled = RenderPdf(
@@ -263,9 +239,7 @@ public class PdfReportRendererTests
     [Fact]
     public void VerticalAlign_IsRendered()
     {
-        var fontPath = FontPath();
-        if (fontPath is null) return;
-        var options = new PdfRenderOptions { FontFilePath = fontPath };
+        var options = Options();
 
         var pdf = RenderPdf(
             """{ "width": 40, "height": 12, "text": "x", "border": true, "vAlign": "middle", "align": "center" }""", new { }, options);
