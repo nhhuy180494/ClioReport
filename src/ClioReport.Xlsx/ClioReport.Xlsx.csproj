@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Excel (.xlsx) writer for ClioReport. Turns the pages produced by ClioReport.Core into a worksheet, with no third-party dependencies.</Description>
+    <PackageTags>$(PackageTags);excel;xlsx</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ClioReport.Core\ClioReport.Core.csproj" />
+  </ItemGroup>
+</Project>

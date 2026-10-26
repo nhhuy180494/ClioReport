@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- New package `ClioReport.Xlsx`: `XlsxReportRenderer.Render(report, "report.xlsx")` writes the laid-out report as an Excel worksheet (text elements as cells in a grid, numbers as numeric cells, bold/italic/size/colour/fill/border/alignment kept). No third-party dependency. Lines, images, barcodes and QR codes are not exported.
+
 - Tests: the PDF render tests no longer skip themselves on machines without Arial; they use the bundled fonts, so CI on Ubuntu really renders PDFs.
 
 - CI: GitHub Actions builds and tests every push and pull request on Ubuntu and Windows. README: Linux and Docker section.

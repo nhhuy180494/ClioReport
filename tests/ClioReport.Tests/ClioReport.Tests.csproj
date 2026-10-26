@@ -12,5 +12,6 @@
     <ProjectReference Include="..\..\src\ClioReport.Pdf\ClioReport.Pdf.csproj" />
     <ProjectReference Include="..\..\src\ClioReport.Pdf.Fonts\ClioReport.Pdf.Fonts.csproj" />
     <ProjectReference Include="..\..\src\ClioReport.Rdlc\ClioReport.Rdlc.csproj" />
+    <ProjectReference Include="..\..\src\ClioReport.Xlsx\ClioReport.Xlsx.csproj" />
   </ItemGroup>
 </Project>
