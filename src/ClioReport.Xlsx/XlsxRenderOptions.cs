@@ -14,4 +14,11 @@ public sealed class XlsxRenderOptions
 
     /// <summary>Show Excel's grid lines on the sheet. Off by default: the sheet then looks like the report.</summary>
     public bool ShowGridLines { get; set; }
+
+    /// <summary>
+    /// Print like the report (on by default): every page of the report starts a new printed page, the paper is the size of
+    /// the report page and the margins put the content where it sits on that page. Off: the pages run down one sheet with a
+    /// blank row between them, printed on A4 and fitted to its width.
+    /// </summary>
+    public bool PrintPages { get; set; } = true;
 }

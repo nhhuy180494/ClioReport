@@ -120,6 +120,49 @@ public class XlsxReportRendererTests
         Assert.NotEqual(rows[0], rows[1]);
     }
 
+    private static XElement SheetXml(byte[] bytes)
+    {
+        using var zip = new ZipArchive(new MemoryStream(bytes));
+        using var s = zip.GetEntry("xl/worksheets/sheet1.xml")!.Open();
+        return XDocument.Load(s).Root!;
+    }
+
+    [Fact]
+    public void Render_PrintPages_BreaksAfterEveryPageAndUsesThePageSize()
+    {
+        var first = Table();
+        var joined = new RenderedReport(first.PageWidth, first.PageHeight, first.Pages.Concat(Table().Pages).Concat(Table().Pages).ToList());
+        var sheet = SheetXml(XlsxReportRenderer.ToBytes(joined));
+
+        var breaks = sheet.Element(Ns + "rowBreaks")!.Elements(Ns + "brk").Select(b => int.Parse((string)b.Attribute("id")!)).ToList();
+        Assert.Equal(2, breaks.Count);                                   // between the 3 pages, none after the last
+        var lastRow = sheet.Descendants(Ns + "row").Max(r => int.Parse((string)r.Attribute("r")!));
+        Assert.Equal(lastRow, breaks[1] + (breaks[1] - breaks[0]));      // pages follow each other with no blank row
+
+        var setup = sheet.Element(Ns + "pageSetup")!;
+        Assert.Equal("210mm", (string?)setup.Attribute("paperWidth"));
+        Assert.Equal("297mm", (string?)setup.Attribute("paperHeight"));
+        var margins = sheet.Element(Ns + "pageMargins")!;
+        Assert.Equal("0", (string?)margins.Attribute("header"));
+        var left = first.Pages[0].Elements.Min(e => e.X);                // page margin + element X: where the content starts
+        Assert.Equal((left / 25.4).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture), (string?)margins.Attribute("left"));
+    }
+
+    [Fact]
+    public void Render_WithoutPrintPages_BlankRowBetweenPagesAndA4()
+    {
+        var first = Table();
+        var joined = new RenderedReport(first.PageWidth, first.PageHeight, first.Pages.Concat(Table().Pages).ToList());
+        var single = SheetXml(XlsxReportRenderer.ToBytes(first, new XlsxRenderOptions { PrintPages = false }));
+        var sheet = SheetXml(XlsxReportRenderer.ToBytes(joined, new XlsxRenderOptions { PrintPages = false }));
+
+        int Rows(XElement s) => s.Descendants(Ns + "row").Max(r => int.Parse((string)r.Attribute("r")!));
+        Assert.Equal(2 * Rows(single) + 1, Rows(sheet));
+        Assert.Null(sheet.Element(Ns + "rowBreaks"));
+        Assert.Null(sheet.Element(Ns + "pageSetup")!.Attribute("paperWidth"));
+        Assert.Equal("0.5", (string?)sheet.Element(Ns + "pageMargins")!.Attribute("left"));
+    }
+
     [Fact]
     public void Render_EmptyReport_StillValid()
     {

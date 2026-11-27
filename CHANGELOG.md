@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.10 (2026-11-27)
+
+- Xlsx: `XlsxRenderOptions.PrintPages` (on by default) prints the sheet like the report: a page break after every report page (no blank row between pages), margins that put the content where it sits on the report page, no header or footer space, and the report page size as `paperWidth`/`paperHeight`. Excel keeps the paper of the printer (it ignores those two attributes), so for labels choose the label stock in the print dialog; each report page then prints on its own label. `PrintPages = false` gives the previous layout (blank row between pages, A4, 0.5" margins).
+
 ## 0.1.0-alpha.9 (2026-11-27)
 
 - Xlsx: pages go down the sheet in the order of `RenderedReport.Pages`, not by page number, so a report joined from several renders (`new RenderedReport(w, h, a.Pages.Concat(b.Pages).ToList())`) keeps every page apart.

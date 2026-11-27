@@ -56,7 +56,7 @@ public static class XlsxReportRenderer
         Part(zip, "xl/workbook.xml", w => WriteWorkbook(w, SheetName(options.SheetName)));
         Part(zip, "xl/_rels/workbook.xml.rels", w => WriteWorkbookRels(w));
         Part(zip, "xl/styles.xml", w => styles.Write(w));
-        Part(zip, "xl/worksheets/sheet1.xml", w => WriteSheet(w, sheet, report.PageWidth > report.PageHeight, options.ShowGridLines, pictures.Count > 0));
+        Part(zip, "xl/worksheets/sheet1.xml", w => WriteSheet(w, sheet, report, options, pictures.Count > 0));
         if (pictures.Count > 0)
         {
             Part(zip, "xl/worksheets/_rels/sheet1.xml.rels", w =>
@@ -100,6 +100,8 @@ public static class XlsxReportRenderer
         public double[] ColumnWidthsMm = Array.Empty<double>();
         public int RowCount;
         public List<Picture> Images = new();
+        public List<int> PageEndRows = new();   // last sheet row of every report page (PrintPages)
+        public double LeftMm, TopMm;           // where the content starts on the report page (PrintPages margins)
     }
 
     private static Sheet BuildSheet(RenderedReport report, XlsxRenderOptions options)
@@ -123,7 +125,10 @@ public static class XlsxReportRenderer
         var columnCount = 1;
 
         // Rows: per page, every top and bottom edge is a boundary (edges closer than the tolerance count as one); a row is
-        // the gap between two boundaries and an element's cell is merged down the rows it covers. A blank row separates pages.
+        // the gap between two boundaries and an element's cell is merged down the rows it covers. With PrintPages every page
+        // ends with a page break; without it a blank row separates pages.
+        sheet.LeftMm = originX;
+        sheet.TopMm = double.MaxValue;
         var rowBase = 0;
         foreach (var pageItems in items.GroupBy(i => i.Page).OrderBy(g => g.Key))
         {
@@ -131,6 +136,7 @@ public static class XlsxReportRenderer
             var bounds = new List<double>();
             foreach (var y in list.SelectMany(e => new[] { e.Y, e.Y + Math.Max(e.Height, 1) }).OrderBy(y => y))
                 if (bounds.Count == 0 || y - bounds[^1] > options.RowTolerance) bounds.Add(y);
+            sheet.TopMm = Math.Min(sheet.TopMm, bounds[0]);
             int RowOf(double y)
             {
                 var best = 0;
@@ -161,7 +167,8 @@ public static class XlsxReportRenderer
                 sheet.RowHeightsPt[rowBase + 1 + k] = k + 1 < bounds.Count ? Math.Max((bounds[k + 1] - bounds[k]) * 72 / 25.4, 1) : 15;
             rowBase += rows;
             sheet.RowCount = rowBase;
-            rowBase++;
+            if (options.PrintPages) sheet.PageEndRows.Add(rowBase);
+            else rowBase++;
         }
 
         sheet.ColumnWidthsMm = Enumerable.Repeat(step, columnCount).ToArray();
@@ -276,8 +283,10 @@ public static class XlsxReportRenderer
         return cleaned.Length == 0 ? "Report" : cleaned;
     }
 
-    private static void WriteSheet(XmlWriter w, Sheet sheet, bool landscape, bool showGridLines, bool hasDrawing)
+    private static void WriteSheet(XmlWriter w, Sheet sheet, RenderedReport report, XlsxRenderOptions options, bool hasDrawing)
     {
+        var landscape = report.PageWidth > report.PageHeight;
+        var showGridLines = options.ShowGridLines;
         w.WriteStartElement("worksheet", Main);
 
         w.WriteStartElement("sheetPr", Main);                       // print: fit the width on one page
@@ -350,18 +359,50 @@ public static class XlsxReportRenderer
             w.WriteEndElement();
         }
 
+        // PrintPages: margins (inches) put the content where it sits on the report page; no header or footer space.
+        var printPages = options.PrintPages && sheet.PageEndRows.Count > 0;
+        static string Inch(double mm) => Math.Max(mm / 25.4, 0).ToString("0.####", CultureInfo.InvariantCulture);
         w.WriteStartElement("pageMargins", Main);
-        foreach (var side in new[] { "left", "right", "top", "bottom" }) w.WriteAttributeString(side, "0.5");
-        w.WriteAttributeString("header", "0.3");
-        w.WriteAttributeString("footer", "0.3");
+        w.WriteAttributeString("left", printPages ? Inch(sheet.LeftMm) : "0.5");
+        w.WriteAttributeString("right", printPages ? "0" : "0.5");
+        w.WriteAttributeString("top", printPages ? Inch(sheet.TopMm) : "0.5");
+        w.WriteAttributeString("bottom", printPages ? "0" : "0.5");
+        w.WriteAttributeString("header", printPages ? "0" : "0.3");
+        w.WriteAttributeString("footer", printPages ? "0" : "0.3");
         w.WriteEndElement();
 
+        // PrintPages: the paper is the report page (paperWidth/paperHeight; paperSize A4 stays as the fallback for readers
+        // that only know paperSize). Width and height are given for the portrait sheet, orientation turns it.
+        static string Mm(double mm) => mm.ToString("0.##", CultureInfo.InvariantCulture) + "mm";
         w.WriteStartElement("pageSetup", Main);
         w.WriteAttributeString("paperSize", "9");
+        if (printPages)
+        {
+            w.WriteAttributeString("paperHeight", Mm(Math.Max(report.PageWidth, report.PageHeight)));
+            w.WriteAttributeString("paperWidth", Mm(Math.Min(report.PageWidth, report.PageHeight)));
+        }
         w.WriteAttributeString("orientation", landscape ? "landscape" : "portrait");
         w.WriteAttributeString("fitToWidth", "1");
         w.WriteAttributeString("fitToHeight", "0");
         w.WriteEndElement();
+
+        // PrintPages: a manual break after every page except the last.
+        if (printPages && sheet.PageEndRows.Count > 1)
+        {
+            var breaks = sheet.PageEndRows.Take(sheet.PageEndRows.Count - 1).ToList();
+            w.WriteStartElement("rowBreaks", Main);
+            w.WriteAttributeString("count", breaks.Count.ToString(CultureInfo.InvariantCulture));
+            w.WriteAttributeString("manualBreakCount", breaks.Count.ToString(CultureInfo.InvariantCulture));
+            foreach (var row in breaks)
+            {
+                w.WriteStartElement("brk", Main);
+                w.WriteAttributeString("id", row.ToString(CultureInfo.InvariantCulture));
+                w.WriteAttributeString("max", "16383");
+                w.WriteAttributeString("man", "1");
+                w.WriteEndElement();
+            }
+            w.WriteEndElement();
+        }
 
         if (hasDrawing)
         {
