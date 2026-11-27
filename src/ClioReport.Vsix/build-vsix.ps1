@@ -1,4 +1,5 @@
-# Builds ClioReport.Vsix.vsix. Needs Visual Studio 2022 or 2026 (with the "Visual Studio extension development" workload) and the .NET 8 SDK.
+# Builds ClioReport.Vsix.vsix. Needs Visual Studio 2022 or 2026 and the .NET 8 SDK. The "Visual Studio extension development"
+# workload is optional: without it the VSSDK targets come from the Microsoft.VSSDK.BuildTools NuGet package.
 #   .\build-vsix.ps1            -> bin\Release\ClioReport.Vsix.vsix
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
@@ -44,10 +45,21 @@ $tpl = Join-Path $PSScriptRoot 'ItemTemplates\CSharp\ClioReport'
 Remove-Item (Join-Path $tpl 'ClioReport.zip') -ErrorAction SilentlyContinue
 Compress-Archive -Path (Join-Path $tpl 'ClioReport.vstemplate'), (Join-Path $tpl 'Blank.clio') -DestinationPath (Join-Path $tpl 'ClioReport.zip')
 
-# VSSDK targets ship with Visual Studio; SDK-style projects import them explicitly.
+# VSSDK targets ship with Visual Studio's "Visual Studio extension development" workload; SDK-style projects import them explicitly.
 $msbuildRoot = Split-Path (Split-Path (Split-Path (Split-Path $msbuild)))
 $vssdk = Get-ChildItem (Join-Path $msbuildRoot 'MSBuild\Microsoft\VisualStudio') -Recurse -Filter Microsoft.VsSDK.targets -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $vssdk) { throw "Microsoft.VsSDK.targets not found under $msbuildRoot. In Visual Studio Installer add the workload 'Visual Studio extension development'." }
+if (-not $vssdk) {
+    # Without the workload: the Microsoft.VSSDK.BuildTools package fetched by the restore above carries the same targets.
+    $assets = Get-Content (Join-Path $PSScriptRoot 'obj\project.assets.json') -Raw | ConvertFrom-Json
+    $library = $assets.libraries.PSObject.Properties.Name | Where-Object { $_ -like 'Microsoft.VSSDK.BuildTools/*' } | Select-Object -First 1
+    if ($library) {
+        foreach ($folder in $assets.packageFolders.PSObject.Properties.Name) {
+            $candidate = Join-Path $folder (Join-Path $library.ToLowerInvariant() 'tools\VSSDK\Microsoft.VsSDK.targets')
+            if (Test-Path $candidate) { $vssdk = Get-Item $candidate; break }
+        }
+    }
+}
+if (-not $vssdk) { throw "Microsoft.VsSDK.targets not found under $msbuildRoot nor in the Microsoft.VSSDK.BuildTools package. In Visual Studio Installer add the workload 'Visual Studio extension development'." }
 Write-Host "VSSDK targets: $($vssdk.FullName)"
 & $msbuild ClioReport.Vsix.csproj /p:Configuration=Release /p:VsSdkTargetsFile="$($vssdk.FullName)" /v:m
 if ($LASTEXITCODE -ne 0) { throw 'build failed' }

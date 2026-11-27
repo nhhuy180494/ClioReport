@@ -19,7 +19,7 @@ Visual Studio runs on .NET Framework, so it cannot load the .NET 8 ClioReport li
 
 ## Build
 
-Needs Visual Studio 2022 or 2026 with the "Visual Studio extension development" workload and the .NET 8 SDK.
+Needs Visual Studio 2022 or 2026 and the .NET 8 SDK. The "Visual Studio extension development" workload is optional: without it the script takes the VSSDK targets from the `Microsoft.VSSDK.BuildTools` NuGet package.
 
 ```powershell
 cd src\ClioReport.Vsix
