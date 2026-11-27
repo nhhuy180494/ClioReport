@@ -183,7 +183,7 @@ internal sealed class ReportRunner
 
             foreach (var e in b.Elements)
             {
-                if (!string.IsNullOrWhiteSpace(e.Expression))
+                if (!string.IsNullOrWhiteSpace(e.Expression) && !IsEmbeddedImage(e.Expression))
                     Compile(e.Expression);
             }
         }
@@ -527,8 +527,12 @@ internal sealed class ReportRunner
                 case ElementKind.Image when !string.IsNullOrWhiteSpace(e.Expression):
                 {
                     // byte[] is the image itself; anything else is taken as a file path.
+                    // An embedded image ('data:image/png;base64,...') is decoded as it is: it is far longer than an expression may be.
+                    if (IsEmbeddedImage(e.Expression!))
+                        image = FromDataUri(e.Expression!.Trim()[1..^1]);
+                    if (image is not null) { text = ""; break; }
                     var value = Eval(e.Expression!, ctx);
-                    image = value as byte[];
+                    image = value as byte[] ?? (value is string uri ? FromDataUri(uri) : null);
                     text = image is null ? Values.Str(value) : "";
                     break;
                 }
@@ -676,6 +680,23 @@ internal sealed class ReportRunner
         {
             throw new ReportException($"{band.Type} band: cannot make a QR code from the text. {ex.Message}", ex);
         }
+    }
+
+    private static bool IsEmbeddedImage(string expression)
+    {
+        var t = expression.Trim();
+        return t.Length > 2 && t.StartsWith("'data:image/", StringComparison.Ordinal) && t[^1] == '\'';
+    }
+
+    // An image given inside the report as 'data:image/png;base64,...' (the designer's Import image button).
+    private static byte[]? FromDataUri(string value)
+    {
+        const string marker = ";base64,";
+        if (!value.StartsWith("data:image/", StringComparison.Ordinal)) return null;
+        var i = value.IndexOf(marker, StringComparison.Ordinal);
+        if (i < 0) return null;
+        try { return Convert.FromBase64String(value[(i + marker.Length)..]); }
+        catch (FormatException) { return null; }
     }
 
     private static void CheckBarcode(BandDefinition band, string text)

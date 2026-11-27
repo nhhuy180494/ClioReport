@@ -361,6 +361,7 @@ body.dragging .band .body { outline: 1px dashed color-mix(in srgb, var(--accent)
     <button id="pvPick" class="ghost" title="Load a JSON file with sample values and rows">Sample data…</button>
     <button id="pvClear" class="ghost" hidden>Clear data</button>
     <button id="pvRefresh" class="ghost">Refresh</button>
+    <button id="pvXlsx" class="ghost" title="Export the report as an Excel file (text as cells in a grid)">Export Excel</button>
     <button id="pvClose" class="primary">Close</button>
   </div>
   <iframe id="pvFrame" title="PDF preview" hidden></iframe>
@@ -1335,15 +1336,26 @@ function imageSourceField(parent, e) {
   row.append(Object.assign(document.createElement('label'), { textContent: 'Image' }));
   const input = document.createElement('input'); input.type = 'text';
   input.placeholder = 'path, e.g. logo.png, or a field name';
-  const lit = literalOf(e.expression); input.value = lit !== null ? lit : (e.expression || '');
+  const lit = literalOf(e.expression); const embedded = lit !== null && lit.startsWith('data:image/');
+  input.value = embedded ? '(embedded image)' : lit !== null ? lit : (e.expression || '');
   input.onchange = () => {
     const v = input.value.trim();
+    if (embedded && v === '(embedded image)') return;
     if (!v) e.expression = undefined;
     else if (looksLikePath(v)) e.expression = "'" + v.replace(/\\/g, '/').replace(/'/g, "\\'") + "'";
     else e.expression = v;
     commit(); renderCanvas();
   };
   row.append(input); parent.append(row);
+  const file = document.createElement('input'); file.type = 'file'; file.accept = 'image/png,image/jpeg,image/gif,image/bmp'; file.hidden = true;
+  file.onchange = () => {
+    const f = file.files[0]; file.value = ''; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { e.expression = "'" + rd.result + "'"; commit(); renderProps(); renderCanvas();
+      toast('Image embedded in the report (' + Math.round(f.size / 1024) + ' KB)' + (f.size > 300 * 1024 ? ': large images make the .clio file big' : '')); };
+    rd.readAsDataURL(f);
+  };
+  parent.append(file, btn(ico('open') + (embedded ? 'Replace image…' : 'Import image…'), () => file.click(), 'ghost'));
 }
 function h4(parent, text) { const h = document.createElement('h4'); h.textContent = text; parent.append(h); }
 function title(parent, text, badge, color) {
@@ -1967,6 +1979,16 @@ $('rdlcInput').onchange = async ev => {
 $('rdlcOk').onclick = () => $('rdlcDlg').close();
 $('bPreview').onclick = preview;
 $('pvRefresh').onclick = preview;
+$('pvXlsx').onclick = async () => {
+  if (location.protocol === 'file:') { pvShow('Export needs the local host.\n\n  dotnet run --project src/ClioReport.Designer\n\nthen open http://localhost:5178 instead of this file.', true); return; }
+  try {
+    const res = await fetch('api/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ report: JSON.parse(serialize()), data: sampleData || undefined, imageRoot: $('pvRoot').value.trim() || autoImageRoot() || undefined, format: 'xlsx' }) });
+    if (!res.ok) { pvShow(await res.text(), true); return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob());
+    a.download = (def.name || 'report') + '.xlsx'; a.click(); URL.revokeObjectURL(a.href); toast('Exported ' + a.download);
+  } catch (e) { pvShow('Cannot reach the host (' + e.message + '). Is it still running?', true); }
+};
 $('pvClose').onclick = () => $('pvDlg').close();
 $('pvPick').onclick = () => $('pvFile').click();
 $('fpFile').onchange = async ev => {

@@ -8,14 +8,16 @@ using ClioReport.Model;
 namespace ClioReport.Xlsx;
 
 /// <summary>
-/// Writes the pages of a <see cref="RenderedReport"/> as one worksheet. Text elements become cells: elements that start at
-/// (nearly) the same top edge form a row and those that start at (nearly) the same left edge form a column, so the cells of
-/// a table line up as a grid. Pages follow each other with an empty row between them. Lines, rectangles, images, barcodes
-/// and QR codes are not exported. Plain numbers (such as <c>1500.4</c>) become numeric cells; text that was formatted, for
-/// instance with <c>Format(x, 'N0')</c>, stays text.
+/// Writes the pages of a <see cref="RenderedReport"/> as one worksheet. Text elements become cells: the columns are a fixed grid (<see cref="XlsxRenderOptions.ColumnWidth"/>), rows follow the
+/// top and bottom edges of the elements, and an element's cell is merged across the columns and rows it covers, so the sheet
+/// keeps the proportions of the page. Pages follow each other with an
+/// empty row between them. Images are placed over the cells they cover. Lines, rectangles, barcodes and QR codes are not exported. Plain numbers (such as
+/// <c>1500.4</c>) become numeric cells; text that was formatted, for instance with <c>Format(x, 'N0')</c>, stays text.
 /// </summary>
 public static class XlsxReportRenderer
 {
+    private const double DefaultFontSize = 8;   // the PDF renderer's default size
+
     private const string Main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     private const string RelNs = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     private const string PackageRel = "http://schemas.openxmlformats.org/package/2006/relationships";
@@ -48,100 +50,142 @@ public static class XlsxReportRenderer
         foreach (var cell in sheet.Cells) cell.StyleIndex = styles.IndexOf(cell.Style);
 
         using var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
-        Part(zip, "[Content_Types].xml", w => WriteContentTypes(w));
+        var pictures = sheet.Images.Where(p => ImageType(p.Data) is not null).ToList();
+        Part(zip, "[Content_Types].xml", w => WriteContentTypes(w, pictures));
         Part(zip, "_rels/.rels", w => WriteRootRels(w));
         Part(zip, "xl/workbook.xml", w => WriteWorkbook(w, SheetName(options.SheetName)));
         Part(zip, "xl/_rels/workbook.xml.rels", w => WriteWorkbookRels(w));
         Part(zip, "xl/styles.xml", w => styles.Write(w));
-        Part(zip, "xl/worksheets/sheet1.xml", w => WriteSheet(w, sheet, report.PageWidth > report.PageHeight));
+        Part(zip, "xl/worksheets/sheet1.xml", w => WriteSheet(w, sheet, report.PageWidth > report.PageHeight, options.ShowGridLines, pictures.Count > 0));
+        if (pictures.Count > 0)
+        {
+            Part(zip, "xl/worksheets/_rels/sheet1.xml.rels", w =>
+            {
+                w.WriteStartElement("Relationships", PackageRel);
+                WriteRelationship(w, "rId1", RelNs + "/drawing", "../drawings/drawing1.xml");
+                w.WriteEndElement();
+            });
+            Part(zip, "xl/drawings/drawing1.xml", w => WriteDrawing(w, pictures));
+            Part(zip, "xl/drawings/_rels/drawing1.xml.rels", w =>
+            {
+                w.WriteStartElement("Relationships", PackageRel);
+                for (var i = 0; i < pictures.Count; i++)
+                    WriteRelationship(w, "rId" + (i + 1), RelNs + "/image", "../media/image" + (i + 1) + "." + ImageType(pictures[i].Data));
+                w.WriteEndElement();
+            });
+            for (var i = 0; i < pictures.Count; i++)
+            {
+                using var media = zip.CreateEntry("xl/media/image" + (i + 1) + "." + ImageType(pictures[i].Data), CompressionLevel.NoCompression).Open();
+                media.Write(pictures[i].Data);
+            }
+        }
     }
 
     // ---------------------------------------------------------------- layout -> grid
 
     private sealed class Cell
     {
-        public int Row, Col;
+        public int Row, EndRow, Col, EndCol;   // 1-based first row, zero-based first column; the End values are exclusive
         public string Text = "";
         public CellStyle Style;
         public int StyleIndex;
     }
+
+    private sealed record Picture(int Row, int EndRow, int Col, int EndCol, byte[] Data);
 
     private sealed class Sheet
     {
         public List<Cell> Cells = new();
         public Dictionary<int, double> RowHeightsPt = new();
         public double[] ColumnWidthsMm = Array.Empty<double>();
+        public int RowCount;
+        public List<Picture> Images = new();
     }
 
     private static Sheet BuildSheet(RenderedReport report, XlsxRenderOptions options)
     {
+        // Pages go down the sheet in list order, not by Number: a report put together from several renders (each numbered
+        // from 1) keeps every page apart.
         var items = new List<(int Page, RenderedElement E)>();
-        foreach (var page in report.Pages)
-            foreach (var e in page.Elements)
-                if (e.Kind == ElementKind.Text && !string.IsNullOrWhiteSpace(e.Text))
-                    items.Add((page.Number, e));
+        for (var p = 0; p < report.Pages.Count; p++)
+            foreach (var e in report.Pages[p].Elements)
+                if (e.Kind == ElementKind.Image ? e.Image is { Length: > 0 } : e.Kind == ElementKind.Text && (!string.IsNullOrWhiteSpace(e.Text) || e.Border || e.Fill is not null))   // empty boxes keep their borders and fill
+                    items.Add((p, e));
 
         var sheet = new Sheet();
         if (items.Count == 0) return sheet;
 
-        // columns: cluster the left edges
-        var xs = items.Select(i => i.E.X).OrderBy(x => x).ToList();
-        var colStarts = new List<double>();
-        foreach (var x in xs)
-            if (colStarts.Count == 0 || x - colStarts[^1] > options.ColumnTolerance) colStarts.Add(x);
-        int ColumnOf(double x)
-        {
-            var c = 0;
-            for (var i = 0; i < colStarts.Count; i++)
-                if (colStarts[i] <= x + 1e-9) c = i;
-            return c;
-        }
+        // Columns: a fixed grid. Every element starts and ends on the nearest grid line and its cell is merged across the
+        // columns it covers, so all columns have the same width and the sheet keeps the proportions of the page.
+        var step = options.ColumnWidth > 0.5 ? options.ColumnWidth : 2.5;
+        var originX = items.Min(i => i.E.X);
+        int ColOf(double x) => (int)Math.Round((x - originX) / step, MidpointRounding.AwayFromZero);
+        var columnCount = 1;
 
-        // rows: cluster the top edges page by page, with a blank row between pages
-        var ordered = items.OrderBy(i => i.Page).ThenBy(i => i.E.Y).ThenBy(i => i.E.X).ToList();
-        var row = 0;
-        var rowStart = double.NaN;
-        var lastPage = -1;
-        var cells = new Dictionary<(int Row, int Col), Cell>();
-        var minWidth = new double[colStarts.Count];
-        Array.Fill(minWidth, double.MaxValue);
-
-        foreach (var (page, e) in ordered)
+        // Rows: per page, every top and bottom edge is a boundary (edges closer than the tolerance count as one); a row is
+        // the gap between two boundaries and an element's cell is merged down the rows it covers. A blank row separates pages.
+        var rowBase = 0;
+        foreach (var pageItems in items.GroupBy(i => i.Page).OrderBy(g => g.Key))
         {
-            if (page != lastPage)
+            var list = pageItems.Select(i => i.E).ToList();
+            var bounds = new List<double>();
+            foreach (var y in list.SelectMany(e => new[] { e.Y, e.Y + Math.Max(e.Height, 1) }).OrderBy(y => y))
+                if (bounds.Count == 0 || y - bounds[^1] > options.RowTolerance) bounds.Add(y);
+            int RowOf(double y)
             {
-                row += lastPage < 0 ? 1 : 2;
-                lastPage = page;
-                rowStart = e.Y;
-            }
-            else if (e.Y - rowStart > options.RowTolerance)
-            {
-                row++;
-                rowStart = e.Y;
+                var best = 0;
+                for (var k = 1; k < bounds.Count; k++)
+                    if (Math.Abs(bounds[k] - y) < Math.Abs(bounds[best] - y)) best = k;
+                return best;
             }
 
-            var col = ColumnOf(e.X);
-            minWidth[col] = Math.Min(minWidth[col], Math.Max(e.Width, 1));
-            var style = CellStyle.From(e);
-            var key = (row, col);
-            if (cells.TryGetValue(key, out var existing))
-                existing.Text += " " + e.Text;
-            else
-                cells[key] = new Cell { Row = row, Col = col, Text = e.Text, Style = style };
+            var placed = new List<Cell>();
+            foreach (var e in list.OrderBy(e => e.Y).ThenBy(e => e.X))
+            {
+                var r0 = RowOf(e.Y);
+                var r1 = Math.Max(RowOf(e.Y + Math.Max(e.Height, 1)), r0 + 1);
+                var c0 = ColOf(e.X);
+                var c1 = Math.Max(ColOf(e.X + Math.Max(e.Width, 1)), c0 + 1);
+                columnCount = Math.Max(columnCount, c1);
+                if (e.Kind == ElementKind.Image)
+                {
+                    sheet.Images.Add(new Picture(r0 + rowBase + 1, r1 + rowBase + 1, c0, c1, e.Image!));
+                    continue;
+                }
+                Place(placed, new Cell { Row = r0 + rowBase + 1, EndRow = r1 + rowBase + 1, Col = c0, EndCol = c1, Text = e.Text, Style = CellStyle.From(e) });
+            }
+            sheet.Cells.AddRange(placed);
 
-            var heightPt = Math.Max(e.Height, 1) * 72 / 25.4;
-            sheet.RowHeightsPt[row] = Math.Max(sheet.RowHeightsPt.GetValueOrDefault(row), heightPt);
+            var rows = Math.Max(bounds.Count - 1, 1);
+            for (var k = 0; k < rows; k++)
+                sheet.RowHeightsPt[rowBase + 1 + k] = k + 1 < bounds.Count ? Math.Max((bounds[k + 1] - bounds[k]) * 72 / 25.4, 1) : 15;
+            rowBase += rows;
+            sheet.RowCount = rowBase;
+            rowBase++;
         }
 
-        sheet.Cells = cells.Values.OrderBy(c => c.Row).ThenBy(c => c.Col).ToList();
-        sheet.ColumnWidthsMm = new double[colStarts.Count];
-        for (var i = 0; i < colStarts.Count; i++)
-        {
-            var width = minWidth[i] == double.MaxValue ? 20 : minWidth[i];
-            if (i + 1 < colStarts.Count) width = Math.Min(width, colStarts[i + 1] - colStarts[i]);
-            sheet.ColumnWidthsMm[i] = Math.Max(width, 5);
-        }
+        sheet.ColumnWidthsMm = Enumerable.Repeat(step, columnCount).ToArray();
         return sheet;
+    }
+
+    private static bool Overlap(Cell a, Cell b) => a.Row < b.EndRow && b.Row < a.EndRow && a.Col < b.EndCol && b.Col < a.EndCol;
+
+    // Adds a cell; where it overlaps another one, one of the two gives way so no merged ranges intersect.
+    private static void Place(List<Cell> list, Cell n)
+    {
+        for (var pass = 0; pass < 2 * list.Count + 4; pass++)
+        {
+            var hit = list.FirstOrDefault(o => Overlap(o, n));
+            if (hit is null) { list.Add(n); return; }
+            if (hit.Row == n.Row && hit.Col == n.Col) { hit.Text = (hit.Text + " " + n.Text).Trim(); return; }
+            if (n.Col < hit.Col) n.EndCol = hit.Col;
+            else if (n.Row < hit.Row) n.EndRow = hit.Row;
+            else if (hit.Col < n.Col) hit.EndCol = n.Col;
+            else if (hit.Row < n.Row) hit.EndRow = n.Row;
+            else { hit.Text = (hit.Text + " " + n.Text).Trim(); return; }
+        }
+        var last = list.FirstOrDefault(o => Overlap(o, n));
+        if (last is null) list.Add(n); else last.Text = (last.Text + " " + n.Text).Trim();
     }
 
     // ---------------------------------------------------------------- xml parts
@@ -157,11 +201,15 @@ public static class XlsxReportRenderer
         writer.WriteEndDocument();
     }
 
-    private static void WriteContentTypes(XmlWriter w)
+    private static void WriteContentTypes(XmlWriter w, List<Picture> pictures)
     {
         w.WriteStartElement("Types", ContentTypes);
         Default(w, "rels", "application/vnd.openxmlformats-package.relationships+xml");
         Default(w, "xml", "application/xml");
+        foreach (var ext in pictures.Select(p => ImageType(p.Data)!).Distinct())
+            Default(w, ext, ext switch { "png" => "image/png", "jpeg" => "image/jpeg", "gif" => "image/gif", _ => "image/bmp" });
+        if (pictures.Count > 0)
+            Override(w, "/xl/drawings/drawing1.xml", "application/vnd.openxmlformats-officedocument.drawing+xml");
         Override(w, "/xl/workbook.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml");
         Override(w, "/xl/worksheets/sheet1.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml");
         Override(w, "/xl/styles.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml");
@@ -228,12 +276,19 @@ public static class XlsxReportRenderer
         return cleaned.Length == 0 ? "Report" : cleaned;
     }
 
-    private static void WriteSheet(XmlWriter w, Sheet sheet, bool landscape)
+    private static void WriteSheet(XmlWriter w, Sheet sheet, bool landscape, bool showGridLines, bool hasDrawing)
     {
         w.WriteStartElement("worksheet", Main);
 
+        w.WriteStartElement("sheetPr", Main);                       // print: fit the width on one page
+        w.WriteStartElement("pageSetUpPr", Main);
+        w.WriteAttributeString("fitToPage", "1");
+        w.WriteEndElement();
+        w.WriteEndElement();
+
         w.WriteStartElement("sheetViews", Main);
         w.WriteStartElement("sheetView", Main);
+        if (!showGridLines) w.WriteAttributeString("showGridLines", "0");
         w.WriteAttributeString("workbookViewId", "0");
         w.WriteEndElement();
         w.WriteEndElement();
@@ -250,26 +305,50 @@ public static class XlsxReportRenderer
                 w.WriteStartElement("col", Main);
                 w.WriteAttributeString("min", (i + 1).ToString(CultureInfo.InvariantCulture));
                 w.WriteAttributeString("max", (i + 1).ToString(CultureInfo.InvariantCulture));
-                w.WriteAttributeString("width", Math.Clamp(sheet.ColumnWidthsMm[i] / 2.0, 3, 100).ToString("0.##", CultureInfo.InvariantCulture));
+                w.WriteAttributeString("width", Math.Clamp(sheet.ColumnWidthsMm[i] / 1.7, 0.3, 100).ToString("0.##", CultureInfo.InvariantCulture));
                 w.WriteAttributeString("customWidth", "1");
                 w.WriteEndElement();
             }
             w.WriteEndElement();
         }
 
+        // every position of a merged range is written, so its borders and fill show on all sides
+        var grid = new Dictionary<int, SortedDictionary<int, (Cell Cell, bool Main)>>();
+        foreach (var cell in sheet.Cells)
+            for (var r = cell.Row; r < cell.EndRow; r++)
+                for (var c = cell.Col; c < cell.EndCol; c++)
+                {
+                    if (!grid.TryGetValue(r, out var line)) grid[r] = line = new SortedDictionary<int, (Cell, bool)>();
+                    line[c] = (cell, r == cell.Row && c == cell.Col);
+                }
+
         w.WriteStartElement("sheetData", Main);
-        foreach (var rowGroup in sheet.Cells.GroupBy(c => c.Row))
+        for (var r = 1; r <= sheet.RowCount; r++)
         {
             w.WriteStartElement("row", Main);
-            w.WriteAttributeString("r", rowGroup.Key.ToString(CultureInfo.InvariantCulture));
-            var height = Math.Clamp(sheet.RowHeightsPt.GetValueOrDefault(rowGroup.Key, 15), 8, 409);
-            w.WriteAttributeString("ht", height.ToString("0.##", CultureInfo.InvariantCulture));
+            w.WriteAttributeString("r", r.ToString(CultureInfo.InvariantCulture));
+            w.WriteAttributeString("ht", Math.Clamp(sheet.RowHeightsPt.GetValueOrDefault(r, 15), 1, 409).ToString("0.##", CultureInfo.InvariantCulture));
             w.WriteAttributeString("customHeight", "1");
-            foreach (var cell in rowGroup.OrderBy(c => c.Col))
-                WriteCell(w, cell);
+            if (grid.TryGetValue(r, out var line))
+                foreach (var (col, entry) in line)
+                    WriteCell(w, entry.Cell, r, col, entry.Main);
             w.WriteEndElement();
         }
         w.WriteEndElement();
+
+        var merged = sheet.Cells.Where(c => c.EndCol - c.Col > 1 || c.EndRow - c.Row > 1).ToList();
+        if (merged.Count > 0)
+        {
+            w.WriteStartElement("mergeCells", Main);
+            w.WriteAttributeString("count", merged.Count.ToString(CultureInfo.InvariantCulture));
+            foreach (var c in merged)
+            {
+                w.WriteStartElement("mergeCell", Main);
+                w.WriteAttributeString("ref", ColumnName(c.Col) + c.Row.ToString(CultureInfo.InvariantCulture) + ":" + ColumnName(c.EndCol - 1) + (c.EndRow - 1).ToString(CultureInfo.InvariantCulture));
+                w.WriteEndElement();
+            }
+            w.WriteEndElement();
+        }
 
         w.WriteStartElement("pageMargins", Main);
         foreach (var side in new[] { "left", "right", "top", "bottom" }) w.WriteAttributeString(side, "0.5");
@@ -280,18 +359,31 @@ public static class XlsxReportRenderer
         w.WriteStartElement("pageSetup", Main);
         w.WriteAttributeString("paperSize", "9");
         w.WriteAttributeString("orientation", landscape ? "landscape" : "portrait");
+        w.WriteAttributeString("fitToWidth", "1");
+        w.WriteAttributeString("fitToHeight", "0");
         w.WriteEndElement();
+
+        if (hasDrawing)
+        {
+            w.WriteStartElement("drawing", Main);
+            w.WriteAttributeString("r", "id", RelNs, "rId1");
+            w.WriteEndElement();
+        }
 
         w.WriteEndElement();
     }
 
-    private static void WriteCell(XmlWriter w, Cell cell)
+    private static void WriteCell(XmlWriter w, Cell cell, int row, int col, bool main)
     {
-        var text = Clean(cell.Text);
+        var text = main ? Clean(cell.Text) : "";
         w.WriteStartElement("c", Main);
-        w.WriteAttributeString("r", ColumnName(cell.Col) + (cell.Row).ToString(CultureInfo.InvariantCulture));
+        w.WriteAttributeString("r", ColumnName(col) + row.ToString(CultureInfo.InvariantCulture));
         w.WriteAttributeString("s", cell.StyleIndex.ToString(CultureInfo.InvariantCulture));
-        if (PlainNumber.IsMatch(text))
+        if (text.Length == 0)
+        {
+            // empty cell: only the style (border, fill) is kept
+        }
+        else if (PlainNumber.IsMatch(text))
         {
             w.WriteElementString("v", Main, text);
         }
@@ -306,6 +398,65 @@ public static class XlsxReportRenderer
             w.WriteEndElement();
         }
         w.WriteEndElement();
+    }
+
+    private static string? ImageType(byte[] d) =>
+        d.Length > 8 && d[0] == 0x89 && d[1] == 0x50 && d[2] == 0x4E && d[3] == 0x47 ? "png" :
+        d.Length > 3 && d[0] == 0xFF && d[1] == 0xD8 ? "jpeg" :
+        d.Length > 3 && d[0] == 0x47 && d[1] == 0x49 && d[2] == 0x46 ? "gif" :
+        d.Length > 2 && d[0] == 0x42 && d[1] == 0x4D ? "bmp" : null;
+
+    private static void WriteDrawing(XmlWriter w, List<Picture> pictures)
+    {
+        const string Xdr = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
+        const string A = "http://schemas.openxmlformats.org/drawingml/2006/main";
+        w.WriteStartElement("xdr", "wsDr", Xdr);
+        w.WriteAttributeString("xmlns", "a", null, A);
+        w.WriteAttributeString("xmlns", "r", null, RelNs);
+        for (var i = 0; i < pictures.Count; i++)
+        {
+            var p = pictures[i];
+            w.WriteStartElement("xdr", "twoCellAnchor", Xdr);
+            w.WriteAttributeString("editAs", "oneCell");
+            Corner(w, "from", p.Col, p.Row - 1);
+            Corner(w, "to", p.EndCol, p.EndRow - 1);
+            w.WriteStartElement("xdr", "pic", Xdr);
+            w.WriteStartElement("xdr", "nvPicPr", Xdr);
+            w.WriteStartElement("xdr", "cNvPr", Xdr);
+            w.WriteAttributeString("id", (i + 2).ToString(CultureInfo.InvariantCulture));
+            w.WriteAttributeString("name", "Picture " + (i + 1).ToString(CultureInfo.InvariantCulture));
+            w.WriteEndElement();
+            w.WriteElementString("xdr", "cNvPicPr", Xdr, "");
+            w.WriteEndElement();
+            w.WriteStartElement("xdr", "blipFill", Xdr);
+            w.WriteStartElement("a", "blip", A);
+            w.WriteAttributeString("r", "embed", RelNs, "rId" + (i + 1).ToString(CultureInfo.InvariantCulture));
+            w.WriteEndElement();
+            w.WriteStartElement("a", "stretch", A);
+            w.WriteElementString("a", "fillRect", A, "");
+            w.WriteEndElement();
+            w.WriteEndElement();
+            w.WriteStartElement("xdr", "spPr", Xdr);
+            w.WriteStartElement("a", "prstGeom", A);
+            w.WriteAttributeString("prst", "rect");
+            w.WriteElementString("a", "avLst", A, "");
+            w.WriteEndElement();
+            w.WriteEndElement();
+            w.WriteEndElement();
+            w.WriteElementString("xdr", "clientData", Xdr, "");
+            w.WriteEndElement();
+        }
+        w.WriteEndElement();
+
+        static void Corner(XmlWriter w, string name, int col, int row)
+        {
+            w.WriteStartElement("xdr", name, Xdr);
+            w.WriteElementString("xdr", "col", Xdr, col.ToString(CultureInfo.InvariantCulture));
+            w.WriteElementString("xdr", "colOff", Xdr, "0");
+            w.WriteElementString("xdr", "row", Xdr, row.ToString(CultureInfo.InvariantCulture));
+            w.WriteElementString("xdr", "rowOff", Xdr, "0");
+            w.WriteEndElement();
+        }
     }
 
     private static string ColumnName(int zeroBased)
@@ -366,7 +517,7 @@ public static class XlsxReportRenderer
             var fills = new List<string?> { null, null };           // 0 none, 1 gray125 (both required by Excel)
             int FontId(CellStyle s)
             {
-                var f = (s.Bold, s.Italic, s.FontSize > 0 ? s.FontSize : 10, "Arial", s.Color);
+                var f = (s.Bold, s.Italic, s.FontSize > 0 ? s.FontSize : DefaultFontSize, "Arial", s.Color);
                 var i = fonts.IndexOf(f);
                 if (i >= 0) return i;
                 fonts.Add(f);

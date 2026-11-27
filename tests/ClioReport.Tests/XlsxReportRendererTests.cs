@@ -61,15 +61,33 @@ public class XlsxReportRendererTests
         var bytes = XlsxReportRenderer.ToBytes(Table());
         var cells = Cells(bytes);
 
-        Assert.Equal("Stock <list> & more", Text(cells["A1"]));
-        Assert.Equal("Code", Text(cells["A2"]));
-        Assert.Equal("Qty", Text(cells["B2"]));
-        Assert.Equal("inlineStr", (string?)cells["A3"].Attribute("t"));   // leading zero stays text
-        Assert.Equal("0012", Text(cells["A3"]));
-        Assert.Null(cells["B3"].Attribute("t"));                           // plain number
-        Assert.Equal("1500.5", Text(cells["B3"]));
-        Assert.Equal("B-2", Text(cells["A4"]));
-        Assert.Equal("7", Text(cells["B4"]));
+        string At(string text) => cells.Single(c => c.Value.Element(Ns + "is") is { } s && s.Value == text).Key;
+        static int Row(string address) => int.Parse(new string(address.Where(char.IsDigit).ToArray()));
+        static string Col(string address) => new string(address.Where(char.IsLetter).ToArray());
+
+        Assert.Equal("A", Col(At("Stock <list> & more")));
+        var code = At("Code");
+        var qty = At("Qty");
+        Assert.Equal(Row(code), Row(qty));                          // header cells share a row
+        Assert.Equal("A", Col(code));
+        Assert.Equal("Q", Col(qty));                                // a 40 mm column is 16 grid columns of 2.5 mm
+        Assert.Equal(Row(code) + 1, Row(At("0012")));               // leading zero stays text
+        Assert.Equal(Row(code) + 2, Row(At("B-2")));
+
+        var number = cells.Values.Single(c => (string?)c.Attribute("r") == "Q" + (Row(code) + 1));
+        Assert.Null(number.Attribute("t"));                          // a plain number is a numeric cell
+        Assert.Equal("1500.5", Text(number));
+        Assert.Equal("7", Text(cells["Q" + (Row(code) + 2)]));
+    }
+
+    [Fact]
+    public void Render_GridLinesAreOffUnlessAsked()
+    {
+        using var off = new ZipArchive(new MemoryStream(XlsxReportRenderer.ToBytes(Table())));
+        using var on = new ZipArchive(new MemoryStream(XlsxReportRenderer.ToBytes(Table(), new XlsxRenderOptions { ShowGridLines = true })));
+        string View(ZipArchive z) { using var s = z.GetEntry("xl/worksheets/sheet1.xml")!.Open(); return (string?)XDocument.Load(s).Descendants(Ns + "sheetView").Single().Attribute("showGridLines") ?? "1"; }
+        Assert.Equal("0", View(off));
+        Assert.Equal("1", View(on));
     }
 
     [Fact]
@@ -83,6 +101,23 @@ public class XlsxReportRendererTests
         }
         using var wb = zip.GetEntry("xl/workbook.xml")!.Open();
         Assert.Equal("ABC", (string?)XDocument.Load(wb).Descendants(Ns + "sheet").Single().Attribute("name"));
+    }
+
+    [Fact]
+    public void Render_PagesOfSeveralRenders_StackInListOrder()
+    {
+        // Two renders both start at page 1; joined into one report they must not land on the same rows.
+        var first = Table();
+        var second = Table();
+        var joined = new RenderedReport(first.PageWidth, first.PageHeight, first.Pages.Concat(second.Pages).ToList());
+
+        var cells = Cells(XlsxReportRenderer.ToBytes(joined));
+        var rows = cells.Where(c => c.Value.Element(Ns + "is") is { } s && s.Value == "B-2")
+            .Select(c => int.Parse(new string(c.Key.Where(char.IsDigit).ToArray())))
+            .ToList();
+
+        Assert.Equal(2, rows.Count);
+        Assert.NotEqual(rows[0], rows[1]);
     }
 
     [Fact]

@@ -2,7 +2,13 @@
 
 ## Unreleased
 
-- New package `ClioReport.Xlsx`: `XlsxReportRenderer.Render(report, "report.xlsx")` writes the laid-out report as an Excel worksheet (text elements as cells in a grid, numbers as numeric cells, bold/italic/size/colour/fill/border/alignment kept). No third-party dependency. Lines, images, barcodes and QR codes are not exported.
+## 0.1.0-alpha.9 (2026-11-27)
+
+- Xlsx: pages go down the sheet in the order of `RenderedReport.Pages`, not by page number, so a report joined from several renders (`new RenderedReport(w, h, a.Pages.Concat(b.Pages).ToList())`) keeps every page apart.
+
+- Image elements: an expression that is a `data:image/...;base64,...` string is used as the image itself. Designer: *Import image…* in the Properties of an image element embeds a file in the report.
+
+- New package `ClioReport.Xlsx`: `XlsxReportRenderer.Render(report, "report.xlsx")` writes the laid-out report as an Excel worksheet (text elements as cells in a grid, numbers as numeric cells, bold/italic/size/colour/fill/border/alignment kept). No third-party dependency. Images are placed over their cells; lines, rectangles, barcodes and QR codes are not exported. Designer: *Export Excel* button in the Preview dialog.
 
 - Tests: the PDF render tests no longer skip themselves on machines without Arial; they use the bundled fonts, so CI on Ubuntu really renders PDFs.
 
@@ -21,7 +27,7 @@
 ## 0.1.0-alpha.7 (2026-10-20)
 
 - Image elements: a path with a leading `/` or `\` (such as `/systemConfig/logo.png`) is now relative to `PdfRenderOptions.ImageRoot` instead of failing.
-- Designer workspace: the Structure and Properties panels can be hidden (`[` and `]`, or the toolbar buttons) and resized by dragging their edge (double-click resets); *Focus mode* (`\` or Esc to leave) shows only the canvas; a button next to the zoom shows only the area with bands instead of the whole blank page; Properties sections fold (remembered) and fields flow in two columns when the panel is wide. The zoom re-fits the width when the layout changes. Layout is remembered per browser.
+- Designer workspace: the Structure and Properties panels can be hidden (`[` and `]`, or the toolbar buttons) and resized by dragging their edge (double-click resets); *Focus mode* (`\` or Esc to leave) shows only the canvas; a button next to the zoom shows only the area with bands instead of the whole blank page; Properties sections fold (remembered) and fields flow in two columns when the panel is wide. The zoom re-fits the width when the layout changes. Layout is remembered per browser.
 - Designer: zoom and pan like a design tool. `Ctrl` + wheel (or trackpad pinch) zooms around the pointer; hold `Space` and drag, or drag with the middle button, to pan; `Ctrl` + `0` fits the width, `Ctrl` + `+`/`-` zoom in steps.
 - Designer: help dialog (`?` button or `F1`) with the workflow and shortcuts; new guide `docs/designer.md`.
 

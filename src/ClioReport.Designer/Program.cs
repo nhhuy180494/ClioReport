@@ -3,6 +3,7 @@ using ClioReport;
 using System.Xml;
 using ClioReport.Pdf;
 using ClioReport.Rdlc;
+using ClioReport.Xlsx;
 
 // Local-only host for the web designer: serves wwwroot and renders a PDF preview of the report being edited.
 //   dotnet run --project src/ClioReport.Designer            -> http://localhost:5178
@@ -23,7 +24,8 @@ var options = CreateOptions();
 // Font families the designer offers per element (the ones found in the OS fonts folder).
 app.MapGet("/api/fonts", () => options.Fonts.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase));
 
-// Body: { "report": <report JSON>, "data": <any JSON object, optional> }. Returns application/pdf, or 400 + text.
+// Body: { "report": <report JSON>, "data": <any JSON object, optional>, "format": "xlsx" (optional) }. Returns application/pdf
+// (or the Excel file when format is "xlsx"), or 400 + text.
 app.MapPost("/api/preview", async (HttpRequest request) =>
 {
     try
@@ -48,6 +50,9 @@ app.MapPost("/api/preview", async (HttpRequest request) =>
 
         using var measurer = new PdfTextMeasurer(renderOptions);
         var report = ReportEngine.Render(definition, data, measurer);
+
+        if (doc.RootElement.TryGetProperty("format", out var formatJson) && formatJson.GetString() == "xlsx")
+            return Results.File(XlsxReportRenderer.ToBytes(report), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
         using var ms = new MemoryStream();
         PdfReportRenderer.Render(report, ms, renderOptions);

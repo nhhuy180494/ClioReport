@@ -17,6 +17,7 @@ The designer edits a report definition (`.clio` / JSON) visually. Start it with 
 3. Add elements: click a tool in the rail, or drag it onto a band. Edit position, size, style and expression in the Properties panel.
 4. For a grid, use the wand (**Table wizard**): pick a collection and tick its fields, then insert the table.
 5. Press **Preview** to render a PDF. Without data, fields are blank.
+   In the Preview dialog, **Export Excel** downloads the same report as an `.xlsx` (text as cells in a grid; lines and images are left out).
 6. **Save** (`Ctrl+S`) writes the `.clio` file; **JSON** shows or edits the raw definition.
 
 ## Expressions
@@ -118,10 +119,6 @@ var ctx = new ObjectDataContext(rows.FirstOrDefault(),
   Inside a detail band, a field is looked up in the current row first, then in the root. `data[0]` throws on an empty list, so use `FirstOrDefault()`.
 - The sample JSON of the designer has the same shape: values for the root and arrays for the collections.
 
-## Data fields
-
-Define the fields once and they are kept in the report. In *Report > Data fields* (or at the bottom of an element's *Data fields* section) choose **Define from JSON…**, paste an example of the data (an object with values and lists of rows, or just a list of rows) or pick a file, and press **Use**. The names and types (text, number, date) are stored in the `.clio` file under `schema`; loading a sample while the report has none saves them automatically. After that the fields are listed, and offered by the Table wizard, without loading any file. A sample that is loaded takes precedence while it is there; **Update from sample** replaces the saved fields with it and **Clear** removes them. The engine ignores `schema`.
-
 ## Sample data
 
 With a text, barcode or QR element selected, the **Data fields** section of the Properties panel lists what the sample offers: the fields of the data source's rows, the report-level fields, and the variables (`PageNumber`, `PageCount`, your aggregates). Click one to insert it into the Expression box at the caret (a box holding only a field name is replaced). *Load sample data…* there loads the file without opening the preview.
@@ -139,6 +136,8 @@ Text and table elements have a **Font** dropdown. The list is the families the h
 ## Images
 
 An image element's expression gives either a `byte[]` (PNG, JPEG, BMP) or a file path. Paths are resolved inside the **Image folder** (Preview toolbar; the designer guesses it from the report's folder) and cannot leave it. Use forward slashes (`logo/company.png`); backslashes are escapes inside expression strings. A missing file prints a dashed "No image" box instead of failing.
+
+**Import image…** (Properties of an image element) embeds a PNG, JPEG, GIF or BMP in the report itself, as the expression `'data:image/png;base64,...'`. It needs no folder and no data field, and the image travels with the `.clio` file. Keep it small (a logo): the file grows by about a third of the image size.
 
 ## Shortcuts
 
