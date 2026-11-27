@@ -163,6 +163,59 @@ public class XlsxReportRendererTests
         Assert.Equal("0.5", (string?)sheet.Element(Ns + "pageMargins")!.Attribute("left"));
     }
 
+    // Borders of the cell at an address: side name -> style ("thin", "medium", "thick"), only the sides that have one.
+    private static Dictionary<string, string> BordersAt(byte[] bytes, string address)
+    {
+        using var zip = new ZipArchive(new MemoryStream(bytes));
+        XElement Load(string name) { using var s = zip.GetEntry(name)!.Open(); return XDocument.Load(s).Root!; }
+        var sheet = Load("xl/worksheets/sheet1.xml");
+        var styles = Load("xl/styles.xml");
+        var cell = sheet.Descendants(Ns + "c").SingleOrDefault(c => (string?)c.Attribute("r") == address);
+        if (cell is null) return new();
+        var xf = styles.Element(Ns + "cellXfs")!.Elements(Ns + "xf").ElementAt(int.Parse((string)cell.Attribute("s")!));
+        var border = styles.Element(Ns + "borders")!.Elements(Ns + "border").ElementAt(int.Parse((string)xf.Attribute("borderId")!));
+        return border.Elements()
+            .Where(e => e.Attribute("style") is not null)
+            .ToDictionary(e => e.Name.LocalName, e => (string)e.Attribute("style")!);
+    }
+
+    [Fact]
+    public void Render_LinesAndRectangles_BecomeCellBorders()
+    {
+        // A 50 x 20 mm box split by a horizontal line at 10 mm and a thick vertical line at 25 mm, with one text in the
+        // top-left quarter. Grid of 2.5 mm columns from x = 10 (page margin): columns A..T, the vertical line between J and K.
+        var definition = new ReportDefinition
+        {
+            Version = 1,
+            Bands =
+            {
+                new BandDefinition
+                {
+                    Type = BandType.ReportHeader,
+                    Height = 30,
+                    Elements =
+                    {
+                        new ElementDefinition { Type = "rect", X = 0, Y = 0, Width = 50, Height = 20 },
+                        new ElementDefinition { Type = "line", X = 0, Y = 10, Width = 50, Height = 0 },
+                        new ElementDefinition { Type = "line", X = 25, Y = 0, Width = 0, Height = 20, Thickness = 0.8 },
+                        new ElementDefinition { X = 0, Y = 0, Width = 25, Height = 10, Text = "A" }
+                    }
+                }
+            }
+        };
+        var bytes = XlsxReportRenderer.ToBytes(ReportEngine.Render(definition, new DictionaryDataContext()));
+
+        Assert.Equal("thin", BordersAt(bytes, "A1")["top"]);       // rectangle, top-left corner
+        Assert.Equal("thin", BordersAt(bytes, "A1")["left"]);
+        Assert.Equal("thick", BordersAt(bytes, "J1")["right"]);    // thick vertical line, left of it
+        Assert.Equal("thick", BordersAt(bytes, "K2")["left"]);     // and right of it, lower half too
+        Assert.Equal("thin", BordersAt(bytes, "E1")["bottom"]);    // horizontal line at 10 mm
+        Assert.Equal("thin", BordersAt(bytes, "E2")["top"]);
+        Assert.Equal("thin", BordersAt(bytes, "T2")["right"]);     // empty cell that only carries the rectangle's side
+        Assert.Equal("thin", BordersAt(bytes, "T2")["bottom"]);
+        Assert.Empty(BordersAt(bytes, "U1"));                      // nothing past the rectangle
+    }
+
     [Fact]
     public void Render_EmptyReport_StillValid()
     {

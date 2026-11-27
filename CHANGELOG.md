@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.11 (2026-11-27)
+
+- Xlsx: lines and rectangles are exported as cell borders. Horizontal and vertical lines become the bottom/top or right/left side of the cells along them, a rectangle the four sides of the cells it encloses (empty cells are written for that); their edges are row boundaries, so the borders sit where the strokes are. Thickness maps to Excel's thin (< 0.4 mm), medium (< 0.66 mm) or thick, and a line colour is kept. Where two strokes meet the same cell side the heavier one wins. Slanted lines are still left out. Bordered text keeps its thin border.
+
 ## 0.1.0-alpha.10 (2026-11-27)
 
 - Xlsx: `XlsxRenderOptions.PrintPages` (on by default) prints the sheet like the report: a page break after every report page (no blank row between pages), margins that put the content where it sits on the report page, no header or footer space, and the report page size as `paperWidth`/`paperHeight`. Excel keeps the paper of the printer (it ignores those two attributes), so for labels choose the label stock in the print dialog; each report page then prints on its own label. `PrintPages = false` gives the previous layout (blank row between pages, A4, 0.5" margins).

@@ -47,7 +47,7 @@ public static class XlsxReportRenderer
 
         var sheet = BuildSheet(report, options);
         var styles = new StyleTable();
-        foreach (var cell in sheet.Cells) cell.StyleIndex = styles.IndexOf(cell.Style);
+        var grid = Grid(sheet, styles);
 
         using var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
         var pictures = sheet.Images.Where(p => ImageType(p.Data) is not null).ToList();
@@ -56,7 +56,7 @@ public static class XlsxReportRenderer
         Part(zip, "xl/workbook.xml", w => WriteWorkbook(w, SheetName(options.SheetName)));
         Part(zip, "xl/_rels/workbook.xml.rels", w => WriteWorkbookRels(w));
         Part(zip, "xl/styles.xml", w => styles.Write(w));
-        Part(zip, "xl/worksheets/sheet1.xml", w => WriteSheet(w, sheet, report, options, pictures.Count > 0));
+        Part(zip, "xl/worksheets/sheet1.xml", w => WriteSheet(w, sheet, grid, report, options, pictures.Count > 0));
         if (pictures.Count > 0)
         {
             Part(zip, "xl/worksheets/_rels/sheet1.xml.rels", w =>
@@ -88,10 +88,37 @@ public static class XlsxReportRenderer
         public int Row, EndRow, Col, EndCol;   // 1-based first row, zero-based first column; the End values are exclusive
         public string Text = "";
         public CellStyle Style;
-        public int StyleIndex;
     }
 
     private sealed record Picture(int Row, int EndRow, int Col, int EndCol, byte[] Data);
+
+    // Lines, rectangles and bordered text become cell borders. Each sheet position keeps the border of its four sides; where
+    // two strokes meet the same side, the heavier one wins.
+    internal enum LineWeight : byte { None, Thin, Medium, Thick }
+
+    internal readonly record struct Edge(LineWeight Weight, string? Color)
+    {
+        // Excel's thin, medium and thick are about 0.26, 0.53 and 0.79 mm.
+        public static Edge From(double thicknessMm, string? color) =>
+            new(thicknessMm < 0.4 ? LineWeight.Thin : thicknessMm < 0.66 ? LineWeight.Medium : LineWeight.Thick, CellStyle.Rgb(color));
+    }
+
+    internal readonly record struct CellEdges(Edge Left, Edge Right, Edge Top, Edge Bottom)
+    {
+        public const int LeftSide = 0, RightSide = 1, TopSide = 2, BottomSide = 3;
+
+        public CellEdges With(int side, Edge edge)
+        {
+            static Edge Max(Edge a, Edge b) => b.Weight > a.Weight ? b : a;
+            return side switch
+            {
+                LeftSide => this with { Left = Max(Left, edge) },
+                RightSide => this with { Right = Max(Right, edge) },
+                TopSide => this with { Top = Max(Top, edge) },
+                _ => this with { Bottom = Max(Bottom, edge) },
+            };
+        }
+    }
 
     private sealed class Sheet
     {
@@ -102,6 +129,11 @@ public static class XlsxReportRenderer
         public List<Picture> Images = new();
         public List<int> PageEndRows = new();   // last sheet row of every report page (PrintPages)
         public double LeftMm, TopMm;           // where the content starts on the report page (PrintPages margins)
+        public Dictionary<(int Row, int Col), CellEdges> Borders = new();
+        public int ColumnCount;
+
+        public void Mark(int row, int col, int side, Edge edge) =>
+            Borders[(row, col)] = Borders.GetValueOrDefault((row, col)).With(side, edge);
     }
 
     private static Sheet BuildSheet(RenderedReport report, XlsxRenderOptions options)
@@ -111,7 +143,14 @@ public static class XlsxReportRenderer
         var items = new List<(int Page, RenderedElement E)>();
         for (var p = 0; p < report.Pages.Count; p++)
             foreach (var e in report.Pages[p].Elements)
-                if (e.Kind == ElementKind.Image ? e.Image is { Length: > 0 } : e.Kind == ElementKind.Text && (!string.IsNullOrWhiteSpace(e.Text) || e.Border || e.Fill is not null))   // empty boxes keep their borders and fill
+                if (e.Kind switch
+                    {
+                        ElementKind.Image => e.Image is { Length: > 0 },
+                        ElementKind.Text => !string.IsNullOrWhiteSpace(e.Text) || e.Border || e.Fill is not null,   // empty boxes keep their borders and fill
+                        ElementKind.Rect => true,
+                        ElementKind.Line => IsFlat(e.Height) || IsFlat(e.Width),   // horizontal or vertical; slanted lines have no cell side
+                        _ => false,
+                    })
                     items.Add((p, e));
 
         var sheet = new Sheet();
@@ -134,8 +173,9 @@ public static class XlsxReportRenderer
         {
             var list = pageItems.Select(i => i.E).ToList();
             var bounds = new List<double>();
-            foreach (var y in list.SelectMany(e => new[] { e.Y, e.Y + Math.Max(e.Height, 1) }).OrderBy(y => y))
+            foreach (var y in list.SelectMany(Tops).OrderBy(y => y))
                 if (bounds.Count == 0 || y - bounds[^1] > options.RowTolerance) bounds.Add(y);
+            var rows = Math.Max(bounds.Count - 1, 1);
             sheet.TopMm = Math.Min(sheet.TopMm, bounds[0]);
             int RowOf(double y)
             {
@@ -145,9 +185,51 @@ public static class XlsxReportRenderer
                 return best;
             }
 
+            // A stroke along row boundary k (0 = top of the page's first row) is the bottom of the row above and the top of the
+            // row below, as far as those rows belong to this page; a stroke along column boundary c is the right side of
+            // column c - 1 and the left side of column c (dropped later when c is past the last column).
+            var pageBase = rowBase;
+            void Horizontal(int k, int c0, int c1, Edge edge)
+            {
+                columnCount = Math.Max(columnCount, c1);
+                for (var c = c0; c < c1; c++)
+                {
+                    if (k >= 1) sheet.Mark(pageBase + k, c, CellEdges.BottomSide, edge);
+                    if (k <= rows - 1) sheet.Mark(pageBase + k + 1, c, CellEdges.TopSide, edge);
+                }
+            }
+            void Vertical(int c, int k0, int k1, Edge edge)
+            {
+                columnCount = Math.Max(columnCount, c);
+                for (var k = k0; k < Math.Min(k1, rows); k++)
+                {
+                    if (c >= 1) sheet.Mark(pageBase + k + 1, c - 1, CellEdges.RightSide, edge);
+                    sheet.Mark(pageBase + k + 1, c, CellEdges.LeftSide, edge);
+                }
+            }
+
             var placed = new List<Cell>();
             foreach (var e in list.OrderBy(e => e.Y).ThenBy(e => e.X))
             {
+                if (e.Kind is ElementKind.Line or ElementKind.Rect)
+                {
+                    var edge = Edge.From(e.Thickness, e.Color);
+                    double x0 = Math.Min(e.X, e.X + e.Width), x1 = Math.Max(e.X, e.X + e.Width);
+                    double y0 = Math.Min(e.Y, e.Y + e.Height), y1 = Math.Max(e.Y, e.Y + e.Height);
+                    int left = ColOf(x0), right = Math.Max(ColOf(x1), left + 1), top = RowOf(y0), bottom = Math.Max(RowOf(y1), top + 1);
+                    if (e.Kind == ElementKind.Rect || IsFlat(e.Height))
+                    {
+                        Horizontal(top, left, right, edge);
+                        if (e.Kind == ElementKind.Rect) Horizontal(RowOf(y1), left, right, edge);
+                    }
+                    if (e.Kind == ElementKind.Rect || !IsFlat(e.Height))
+                    {
+                        Vertical(ColOf(x0), top, bottom, edge);
+                        if (e.Kind == ElementKind.Rect) Vertical(ColOf(x1), top, bottom, edge);
+                    }
+                    continue;
+                }
+
                 var r0 = RowOf(e.Y);
                 var r1 = Math.Max(RowOf(e.Y + Math.Max(e.Height, 1)), r0 + 1);
                 var c0 = ColOf(e.X);
@@ -162,7 +244,22 @@ public static class XlsxReportRenderer
             }
             sheet.Cells.AddRange(placed);
 
-            var rows = Math.Max(bounds.Count - 1, 1);
+            // Bordered text: a thin border around the cell it ended up in.
+            var thin = new Edge(LineWeight.Thin, null);
+            foreach (var cell in placed.Where(c => c.Style.Border))
+            {
+                for (var c = cell.Col; c < cell.EndCol; c++)
+                {
+                    sheet.Mark(cell.Row, c, CellEdges.TopSide, thin);
+                    sheet.Mark(cell.EndRow - 1, c, CellEdges.BottomSide, thin);
+                }
+                for (var r = cell.Row; r < cell.EndRow; r++)
+                {
+                    sheet.Mark(r, cell.Col, CellEdges.LeftSide, thin);
+                    sheet.Mark(r, cell.EndCol - 1, CellEdges.RightSide, thin);
+                }
+            }
+
             for (var k = 0; k < rows; k++)
                 sheet.RowHeightsPt[rowBase + 1 + k] = k + 1 < bounds.Count ? Math.Max((bounds[k + 1] - bounds[k]) * 72 / 25.4, 1) : 15;
             rowBase += rows;
@@ -171,8 +268,37 @@ public static class XlsxReportRenderer
             else rowBase++;
         }
 
+        sheet.ColumnCount = columnCount;
         sheet.ColumnWidthsMm = Enumerable.Repeat(step, columnCount).ToArray();
         return sheet;
+
+        // Row boundaries an element brings: a stroke lies exactly on its edges; a box is at least 1 mm tall.
+        static IEnumerable<double> Tops(RenderedElement e) =>
+            e.Kind is ElementKind.Line or ElementKind.Rect ? new[] { e.Y, e.Y + e.Height } : new[] { e.Y, e.Y + Math.Max(e.Height, 1) };
+    }
+
+    private static bool IsFlat(double size) => Math.Abs(size) < 0.01;
+
+    // Every sheet position to write: those covered by a text cell (the first one holds the text; every position of a merged
+    // range carries the style, so borders and fill show on all sides) and the empty ones that only carry a border.
+    private static SortedDictionary<int, SortedDictionary<int, (string Text, int Style)>> Grid(Sheet sheet, StyleTable styles)
+    {
+        var cells = new Dictionary<(int Row, int Col), (Cell Cell, bool Main)>();
+        foreach (var cell in sheet.Cells)
+            for (var r = cell.Row; r < cell.EndRow; r++)
+                for (var c = cell.Col; c < cell.EndCol; c++)
+                    cells[(r, c)] = (cell, r == cell.Row && c == cell.Col);
+
+        var grid = new SortedDictionary<int, SortedDictionary<int, (string Text, int Style)>>();
+        foreach (var (r, c) in cells.Keys.Concat(sheet.Borders.Keys).Distinct())
+        {
+            if (r < 1 || r > sheet.RowCount || c < 0 || c >= sheet.ColumnCount) continue;
+            var found = cells.TryGetValue((r, c), out var entry);
+            var style = styles.IndexOf(new Xf(found ? entry.Cell.Style : default, sheet.Borders.GetValueOrDefault((r, c))));
+            if (!grid.TryGetValue(r, out var line)) grid[r] = line = new SortedDictionary<int, (string, int)>();
+            line[c] = (found && entry.Main ? Clean(entry.Cell.Text) : "", style);
+        }
+        return grid;
     }
 
     private static bool Overlap(Cell a, Cell b) => a.Row < b.EndRow && b.Row < a.EndRow && a.Col < b.EndCol && b.Col < a.EndCol;
@@ -283,7 +409,8 @@ public static class XlsxReportRenderer
         return cleaned.Length == 0 ? "Report" : cleaned;
     }
 
-    private static void WriteSheet(XmlWriter w, Sheet sheet, RenderedReport report, XlsxRenderOptions options, bool hasDrawing)
+    private static void WriteSheet(XmlWriter w, Sheet sheet, SortedDictionary<int, SortedDictionary<int, (string Text, int Style)>> grid,
+        RenderedReport report, XlsxRenderOptions options, bool hasDrawing)
     {
         var landscape = report.PageWidth > report.PageHeight;
         var showGridLines = options.ShowGridLines;
@@ -321,16 +448,6 @@ public static class XlsxReportRenderer
             w.WriteEndElement();
         }
 
-        // every position of a merged range is written, so its borders and fill show on all sides
-        var grid = new Dictionary<int, SortedDictionary<int, (Cell Cell, bool Main)>>();
-        foreach (var cell in sheet.Cells)
-            for (var r = cell.Row; r < cell.EndRow; r++)
-                for (var c = cell.Col; c < cell.EndCol; c++)
-                {
-                    if (!grid.TryGetValue(r, out var line)) grid[r] = line = new SortedDictionary<int, (Cell, bool)>();
-                    line[c] = (cell, r == cell.Row && c == cell.Col);
-                }
-
         w.WriteStartElement("sheetData", Main);
         for (var r = 1; r <= sheet.RowCount; r++)
         {
@@ -340,7 +457,7 @@ public static class XlsxReportRenderer
             w.WriteAttributeString("customHeight", "1");
             if (grid.TryGetValue(r, out var line))
                 foreach (var (col, entry) in line)
-                    WriteCell(w, entry.Cell, r, col, entry.Main);
+                    WriteCell(w, entry.Text, entry.Style, r, col);
             w.WriteEndElement();
         }
         w.WriteEndElement();
@@ -414,12 +531,11 @@ public static class XlsxReportRenderer
         w.WriteEndElement();
     }
 
-    private static void WriteCell(XmlWriter w, Cell cell, int row, int col, bool main)
+    private static void WriteCell(XmlWriter w, string text, int style, int row, int col)
     {
-        var text = main ? Clean(cell.Text) : "";
         w.WriteStartElement("c", Main);
         w.WriteAttributeString("r", ColumnName(col) + row.ToString(CultureInfo.InvariantCulture));
-        w.WriteAttributeString("s", cell.StyleIndex.ToString(CultureInfo.InvariantCulture));
+        w.WriteAttributeString("s", style.ToString(CultureInfo.InvariantCulture));
         if (text.Length == 0)
         {
             // empty cell: only the style (border, fill) is kept
@@ -531,7 +647,7 @@ public static class XlsxReportRenderer
             e.Style.Bold, e.Style.Italic, e.Style.FontSize, Rgb(e.Color), Rgb(e.Fill), e.Border,
             e.Align, e.VAlign, e.Text.Contains('\n'));
 
-        private static string? Rgb(string? hex)
+        internal static string? Rgb(string? hex)
         {
             if (string.IsNullOrEmpty(hex) || hex[0] != '#') return null;
             var digits = hex[1..].ToUpperInvariant();
@@ -540,12 +656,15 @@ public static class XlsxReportRenderer
         }
     }
 
+    // One cell format: the text style plus the borders of that position (CellStyle.Border is turned into borders earlier).
+    internal readonly record struct Xf(CellStyle Style, CellEdges Edges);
+
     private sealed class StyleTable
     {
-        private readonly List<CellStyle> _styles = new() { default };
-        private readonly Dictionary<CellStyle, int> _index = new();
+        private readonly List<Xf> _styles = new() { default };
+        private readonly Dictionary<Xf, int> _index = new();
 
-        public int IndexOf(CellStyle style)
+        public int IndexOf(Xf style)
         {
             if (_index.TryGetValue(style, out var i)) return i;
             _styles.Add(style);
@@ -573,7 +692,16 @@ public static class XlsxReportRenderer
                 return fills.Count - 1;
             }
 
-            var xfs = _styles.Select(s => (Font: FontId(s), Fill: FillId(s), Style: s)).ToList();
+            var borders = new List<CellEdges> { default };            // 0 = no border
+            int BorderId(CellEdges e)
+            {
+                var i = borders.IndexOf(e);
+                if (i >= 0) return i;
+                borders.Add(e);
+                return borders.Count - 1;
+            }
+
+            var xfs = _styles.Select(x => (Font: FontId(x.Style), Fill: FillId(x.Style), Border: BorderId(x.Edges), Style: x.Style)).ToList();
 
             w.WriteStartElement("styleSheet", Main);
 
@@ -618,22 +746,17 @@ public static class XlsxReportRenderer
             w.WriteEndElement();
 
             w.WriteStartElement("borders", Main);
-            w.WriteAttributeString("count", "2");
-            w.WriteStartElement("border", Main);
-            foreach (var side in new[] { "left", "right", "top", "bottom", "diagonal" }) Empty(w, side);
-            w.WriteEndElement();
-            w.WriteStartElement("border", Main);
-            foreach (var side in new[] { "left", "right", "top", "bottom" })
+            w.WriteAttributeString("count", borders.Count.ToString(CultureInfo.InvariantCulture));
+            foreach (var b in borders)
             {
-                w.WriteStartElement(side, Main);
-                w.WriteAttributeString("style", "thin");
-                w.WriteStartElement("color", Main);
-                w.WriteAttributeString("auto", "1");
-                w.WriteEndElement();
+                w.WriteStartElement("border", Main);
+                Side(w, "left", b.Left);
+                Side(w, "right", b.Right);
+                Side(w, "top", b.Top);
+                Side(w, "bottom", b.Bottom);
+                Empty(w, "diagonal");
                 w.WriteEndElement();
             }
-            Empty(w, "diagonal");
-            w.WriteEndElement();
             w.WriteEndElement();
 
             w.WriteStartElement("cellStyleXfs", Main);
@@ -648,13 +771,13 @@ public static class XlsxReportRenderer
 
             w.WriteStartElement("cellXfs", Main);
             w.WriteAttributeString("count", xfs.Count.ToString(CultureInfo.InvariantCulture));
-            foreach (var (font, fill, s) in xfs)
+            foreach (var (font, fill, border, s) in xfs)
             {
                 w.WriteStartElement("xf", Main);
                 w.WriteAttributeString("numFmtId", "0");
                 w.WriteAttributeString("fontId", font.ToString(CultureInfo.InvariantCulture));
                 w.WriteAttributeString("fillId", fill.ToString(CultureInfo.InvariantCulture));
-                w.WriteAttributeString("borderId", s.Border ? "1" : "0");
+                w.WriteAttributeString("borderId", border.ToString(CultureInfo.InvariantCulture));
                 w.WriteAttributeString("xfId", "0");
                 w.WriteAttributeString("applyFont", "1");
                 w.WriteAttributeString("applyFill", "1");
@@ -683,6 +806,20 @@ public static class XlsxReportRenderer
             static void Empty(XmlWriter w, string name)
             {
                 w.WriteStartElement(name, Main);
+                w.WriteEndElement();
+            }
+
+            static void Side(XmlWriter w, string name, Edge edge)
+            {
+                w.WriteStartElement(name, Main);
+                if (edge.Weight != LineWeight.None)
+                {
+                    w.WriteAttributeString("style", edge.Weight switch { LineWeight.Medium => "medium", LineWeight.Thick => "thick", _ => "thin" });
+                    w.WriteStartElement("color", Main);
+                    if (edge.Color is null) w.WriteAttributeString("auto", "1");
+                    else w.WriteAttributeString("rgb", edge.Color);
+                    w.WriteEndElement();
+                }
                 w.WriteEndElement();
             }
 
